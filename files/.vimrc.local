@@ -1,0 +1,32 @@
+" Real tabs should be used and should be 4 colums wide.
+set tabstop=4 softtabstop=4 shiftwidth=4 noexpandtab
+
+" Use 256 colors.
+set t_Co=256
+
+" Enable using the mouse.
+set mouse=a
+
+" Set the colorscheme
+set background=dark
+colorscheme solarized
+
+" Set guides
+set list listchars=tab:❘-,trail:·,extends:»,precedes:«,nbsp:×
+
+" Set a 80 column ruler
+set colorcolumn=80
+
+" Use port 9001 for xdebug (php-fpm is on 9000)
+let g:debuggerPort = 9001
+
+
+""" Key Bindings
+
+" Toggle search highlighting
+nnoremap <F3> :set hlsearch!<CR>
+
+" Allow raw pasting (without auto indents)
+nnoremap <C-v> :set invpaste paste?<CR>
+set pastetoggle=<C-v>
+set showmode

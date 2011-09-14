@@ -1,0 +1,14 @@
+[user]
+	name = Parsha Pourkhomami
+	email = parshap+git@gmail.com
+[core]
+	autocrlf = input
+	editor = vim
+[alias]
+	s = status -sb
+	c = commit
+	a = editor add
+	d = diff --word-diff
+	l = "log --decorate --format=format:'%Creset<%Cred%ad%Creset> %Cgreen%h%d %Creset%s' --date=short"
+[color]
+	ui = true
