@@ -7,7 +7,7 @@
 [alias]
 	s = status -sb
 	c = commit
-	a = editor add
+	a = add
 	d = diff --word-diff
 	l = "log --decorate --format=format:'%Creset<%Cred%ad%Creset> %Cgreen%h%d %Creset%s' --date=short"
 [color]
