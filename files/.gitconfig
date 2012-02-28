@@ -1,14 +1,42 @@
 [user]
 	name = Parsha Pourkhomami
 	email = parshap+git@gmail.com
+
 [core]
 	autocrlf = input
 	editor = vim
+
 [alias]
+	# Simple shortcuts
 	s = status -sb
 	c = commit
 	a = add
 	d = diff --word-diff
+	co = checkout
+	b = branch
+
+	# Don't let pull create merges
+	p = pull --ff-only
+
+	# Merge always merges
+	m = merge --no-ff
+
+	# Pretty log formatting
 	l = "log --decorate --format=format:'%Creset<%Cred%ad%Creset> %Cgreen%h%d %Creset%s' --date=short"
+
+	# Display the current head only
+	head = "log --decorate --format=format:'%Creset<%Cred%ad%Creset> %Cgreen%h%d %Creset%s' --date=short -n 1"
+
+	# Pretty log graph formatting
+	lg = "log --graph --oneline --all"
+
+	# Amend previous commit
+	# http://superuser.com/a/170828
+	fix = commit --amend -C HEAD
+
+	# "When you're a little worried taht the world is coming to an end"
+	# http://superuser.com/questions/169695/what-are-your-favorite-git-aliases/169702#169702
+	panic = !tar cvf ../git_panic.tar *
+
 [color]
 	ui = true
