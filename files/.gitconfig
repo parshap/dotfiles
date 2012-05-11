@@ -21,6 +21,9 @@
 	# Merge always merges
 	m = merge --no-ff
 
+	# Merge with fast-forward
+	ff = merge --ff-only
+
 	# Pretty log formatting
 	l = "log --decorate --format=format:'%Creset<%Cred%ad%Creset> %Cgreen%h%d %Creset%s' --date=short"
 
