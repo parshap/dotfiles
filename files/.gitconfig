@@ -34,7 +34,7 @@
 	head = "log --decorate --format=format:'%Creset<%Cred%ad%Creset> %Cgreen%h%d %Creset%s' --date=short -n 1"
 
 	# Pretty log graph formatting
-	lg = "log --graph --oneline --all"
+	lg = "log --graph --pretty=oneline --abbrev-commit --decorate"
 
 	# Amend previous commit
 	# http://superuser.com/a/170828
