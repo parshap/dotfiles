@@ -11,9 +11,12 @@
 	s = status -sb
 	c = commit
 	a = add
-	d = diff --word-diff
+	d = diff
+	dc = diff --cached
 	co = checkout
 	b = branch
+	f = fetch
+	cp = cherry-pick
 
 	# Don't let pull create merges
 	p = pull --ff-only
