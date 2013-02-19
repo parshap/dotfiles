@@ -17,6 +17,7 @@
 	b = branch
 	f = fetch
 	cp = cherry-pick
+	sm = submodule
 
 	# Don't let pull create merges
 	p = pull --ff-only
