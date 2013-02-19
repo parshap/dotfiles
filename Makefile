@@ -1,6 +1,5 @@
 make:
-	npm install
-	PATH=./node_modules/.bin:$(PATH) jake
+	npm install && node install.js
 
 clean:
 	git clean -xdf
