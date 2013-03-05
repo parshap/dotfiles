@@ -21,7 +21,7 @@ ZSH_THEME="robbyrussell"
 
 # Which plugins would you like to load? (plugins can be found in ~/.oh-my-zsh/plugins/*)
 # Example format: plugins=(rails git textmate ruby lighthouse)
-plugins=(git vagrant ssh-agent)
+plugins=(git vagrant ssh-agent compleat npm)
 
 # Load ssh-agent
 zstyle :omz:plugins:ssh-agent id_rsa
