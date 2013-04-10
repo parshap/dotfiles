@@ -18,6 +18,8 @@
 	f = fetch
 	cp = cherry-pick
 	sm = submodule
+	r = rebase
+	ri = rebase -i
 
 	# Don't let pull create merges
 	p = pull --ff-only
