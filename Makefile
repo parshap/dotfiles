@@ -1,5 +1,7 @@
 make:
-	npm install && node install.js
+	npm install && \
+		node install.js && \
+		lesskey
 
 clean:
 	git clean -xdf
