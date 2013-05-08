@@ -21,6 +21,8 @@
 	sm = submodule
 	r = rebase
 	ri = rebase -i
+	rc = rebase --continue
+	ra = rebase --abort
 
 	# Don't let pull create merges
 	p = pull --ff-only
