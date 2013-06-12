@@ -25,6 +25,9 @@ if has("gui_running")
 	set guioptions=egmrt
 endif
 
+" Spell check
+set spell
+
 
 """ Key Bindings
 
