@@ -25,6 +25,9 @@ endif
 " Spell check
 set spell
 
+" `Jakefile` is javascript
+autocmd BufNewFile,BufRead Jakefile setlocal filetype=javascript
+
 """ Indentation
 
 " Real tabs should be used and should be 4 colums wide.
@@ -36,12 +39,10 @@ autocmd FileType ruby setlocal tabstop=2 softtabstop=2 shiftwidth=2 expandtab
 
 """ Key Bindings
 
-" Toggle search highlighting
+" f3 - Toggle search highlighting
 nnoremap <F3> :set hlsearch!<CR>
 
-" Allow raw pasting (without auto indents)
+" ctrl+v - Allow raw pasting (without auto indents)
 nnoremap <C-v> :set invpaste paste?<CR>
 set pastetoggle=<C-v>
 set showmode
-
-au BufNewFile,BufRead Jakefile set filetype=javascript
