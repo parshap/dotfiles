@@ -1,6 +1,3 @@
-" Real tabs should be used and should be 4 colums wide.
-set tabstop=4 softtabstop=4 shiftwidth=4 noexpandtab
-
 " Use 256 colors.
 set t_Co=256
 
@@ -27,6 +24,14 @@ endif
 
 " Spell check
 set spell
+
+""" Indentation
+
+" Real tabs should be used and should be 4 colums wide.
+set tabstop=4 softtabstop=4 shiftwidth=4 noexpandtab
+
+" FileType-based settings
+autocmd FileType ruby setlocal tabstop=2 softtabstop=2 shiftwidth=2 expandtab
 
 
 """ Key Bindings
