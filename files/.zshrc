@@ -24,6 +24,7 @@ ZSH_THEME="robbyrussell"
 plugins=(git vagrant ssh-agent compleat npm)
 
 # Load ssh-agent
+zstyle :omz:plugins:ssh-agent agent-forwarding on
 zstyle :omz:plugins:ssh-agent id_rsa
 
 source $ZSH/oh-my-zsh.sh
