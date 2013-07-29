@@ -3,7 +3,7 @@
 
 var path = require("path"),
 	fs = require("fs"),
-	findit = require("findit"),
+	walkdir = require("walkdir"),
 	async = require("async");
 
 var FILES_PATH = path.join(__dirname, "files");
@@ -32,5 +32,5 @@ function link(file) {
 	});
 }
 
-findit(FILES_PATH)
+walkdir(FILES_PATH)
 	.on("file", link);

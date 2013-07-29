@@ -1,8 +1,8 @@
 {
-	"name": "parshap-dotfiles",
-	"version": "0.1.0",
-	"dependencies": {
-		"findit": "",
-		"async": ""
-	}
+  "name": "parshap-dotfiles",
+  "version": "0.1.0",
+  "dependencies": {
+    "async": "",
+    "walkdir": ""
+  }
 }
