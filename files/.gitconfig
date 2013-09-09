@@ -19,6 +19,7 @@
 	f = fetch
 	cp = cherry-pick
 	sm = submodule
+	smu = submodule update --init --recursive
 	r = rebase
 	ri = rebase -i
 	rc = rebase --continue
