@@ -24,6 +24,9 @@
 	rc = rebase --continue
 	ra = rebase --abort
 
+	# Get SHA1 hash of HEAD commit
+	hash = rev-parse HEAD
+
 	# Don't let pull create merges
 	p = pull --ff-only
 
