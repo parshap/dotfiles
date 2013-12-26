@@ -30,7 +30,7 @@ zstyle :omz:plugins:ssh-agent id_rsa
 source $ZSH/oh-my-zsh.sh
 
 # Customize to your needs...
-export PATH=/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:/usr/X11/bin
+export PATH=$HOME/bin:/usr/local/bin:$PATH
 
 # Language
 export LC_ALL=en_US.UTF-8
