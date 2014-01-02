@@ -35,3 +35,6 @@ if [ "$TMUX" = "" ]
 then
 	tmux attach
 fi
+
+# Aliases
+alias n='npm'
