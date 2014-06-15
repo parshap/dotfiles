@@ -38,3 +38,4 @@ fi
 
 # Aliases
 alias n='npm'
+alias v='vagrant'
