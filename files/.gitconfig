@@ -60,5 +60,8 @@
 	# http://superuser.com/questions/169695/what-are-your-favorite-git-aliases/169702#169702
 	panic = !tar cvf ../git_panic.tar *
 
+	# Get the project root directory
+	root = !pwd
+
 [color]
 	ui = true
