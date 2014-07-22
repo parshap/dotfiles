@@ -14,9 +14,6 @@ set list listchars=tab:❘-,trail:·,extends:»,precedes:«,nbsp:×
 " Set a 80 column ruler
 set colorcolumn=80
 
-" Use port 9001 for xdebug (php-fpm is on 9000)
-let g:debuggerPort = 9001
-
 " Hide gui toolbar
 if has("gui_running")
 	set guioptions=egmrt
