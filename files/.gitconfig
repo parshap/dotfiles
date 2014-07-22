@@ -44,10 +44,10 @@
 	ff = merge --ff-only
 
 	# Pretty log formatting
-	l = "log --decorate --format=format:'%Creset<%Cred%ad%Creset> %Cgreen%h%d %Creset%s' --date=short"
+	l = "log --decorate --format=format:'%Creset<%Cred%ad%Creset> %Cgreen%h%d %Creset%s (%Cblue%aN%Creset)' --date=short"
 
 	# Display the current head only
-	head = "log --decorate --format=format:'%Creset<%Cred%ad%Creset> %Cgreen%h%d %Creset%s' --date=short -n 1"
+	head = "log --decorate --format=format:'%Creset<%Cred%ad%Creset> %Cgreen%h%d %Creset%s (%Cblue%aN%Creset)' --date=short -n 1"
 
 	# Pretty log graph formatting
 	lg = "log --graph --pretty=oneline --abbrev-commit --decorate"
