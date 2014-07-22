@@ -14,6 +14,7 @@
 	s = status -sb
 	c = commit
 	a = add
+	au = add --update
 	d = diff
 	dc = diff --cached
 	co = checkout
@@ -27,6 +28,8 @@
 	ri = rebase -i
 	rc = rebase --continue
 	ra = rebase --abort
+	g = grep
+	amend = commit --amend
 
 	# Get SHA1 hash of HEAD commit
 	hash = rev-parse HEAD
