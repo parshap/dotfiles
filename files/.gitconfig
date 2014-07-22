@@ -2,6 +2,9 @@
 	name = Parsha Pourkhomami
 	email = parshap+git@gmail.com
 
+[github]
+	user = parshap
+
 [core]
 	autocrlf = input
 	editor = vim
