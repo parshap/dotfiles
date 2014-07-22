@@ -25,6 +25,16 @@ then
 	export PATH=$brew_ruby_prefix/bin:$PATH
 fi
 
+# Predictable SSH authentication socket location.
+# See http://qq.is/tutorial/2011/11/17/ssh-keys-through-screen.html
+SOCK="/tmp/ssh-agent-$USER"
+if test $SSH_AUTH_SOCK && [ $SSH_AUTH_SOCK != $SOCK ]
+then
+	rm -f /tmp/ssh-agent-$USER
+	ln -sf $SSH_AUTH_SOCK $SOCK
+	export SSH_AUTH_SOCK=$SOCK
+fi
+
 # Language
 export LC_ALL=en_US.UTF-8
 export LANG=en_US.UTF-8
