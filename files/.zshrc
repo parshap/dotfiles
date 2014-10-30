@@ -46,6 +46,11 @@ then
 	tmux attach
 fi
 
+# Mocha
+mocha () {
+	"$(git root)/node_modules/.bin/mocha" $@
+}
+
 # Aliases
 alias n='npm'
 alias v='vagrant'
