@@ -22,6 +22,9 @@ endif
 " Spell check
 set spell
 
+" Line numbers
+set number
+
 " `Jakefile` is javascript
 autocmd BufNewFile,BufRead Jakefile setlocal filetype=javascript
 
