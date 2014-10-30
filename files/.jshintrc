@@ -11,6 +11,7 @@
 	"indent": 2,
 	"maxdepth": 4,
 	"eqeqeq": true,
+	"eqnull": true,
 	"unused": true,
 	"bitwise": true,
 	"forin": true,
