@@ -41,9 +41,6 @@ autocmd FileType markdown setlocal tabstop=2 softtabstop=2 shiftwidth=2 expandta
 
 """ Key Bindings
 
-" f3 - Toggle search highlighting
-nnoremap <F3> :set hlsearch!<CR>
-
 " ctrl+v - Allow raw pasting (without auto indents)
 nnoremap <C-v> :set invpaste paste?<CR>
 set pastetoggle=<C-v>
