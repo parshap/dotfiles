@@ -40,12 +40,6 @@ export LC_ALL=en_US.UTF-8
 export LANG=en_US.UTF-8
 export LANGUAGE=en_US.UTF-8
 
-# Attach to tmux session
-if [ "$TMUX" = "" ]
-then
-	tmux attach
-fi
-
 # Mocha
 mocha () {
 	"$(git root)/node_modules/.bin/mocha" $@
@@ -53,4 +47,20 @@ mocha () {
 
 # Aliases
 alias n='npm'
-alias v='vagrant'
+
+v() {
+	local command=$1
+	# shift
+	case "$1" in
+		"s") command=status ;;
+		"u") command=up ;;
+		"p") command=provision ;;
+	esac
+	vagrant $command
+}
+
+# Attach to tmux session
+if [ "$TMUX" = "" ]
+then
+	tmux attach
+fi
