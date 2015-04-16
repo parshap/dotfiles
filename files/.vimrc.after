@@ -52,3 +52,7 @@ map <leader>v :set invpaste paste?<CR>
 set pastetoggle=<leader>v
 
 set showmode
+
+" Resize window
+nnoremap <silent> <Leader>+ :exe "resize " . (winheight(0) * 3/2)<CR>
+nnoremap <silent> <Leader>- :exe "resize " . (winheight(0) * 2/3)<CR>
