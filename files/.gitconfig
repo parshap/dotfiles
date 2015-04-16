@@ -30,6 +30,7 @@
 	ra = rebase --abort
 	g = grep --perl-regexp
 	amend = commit --amend
+	bu = branch --set-upstream-to
 
 	# Get SHA1 hash of HEAD commit
 	hash = rev-parse HEAD
