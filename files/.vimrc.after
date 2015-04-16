@@ -48,6 +48,7 @@ autocmd! BufEnter *.jsx let b:syntastic_checkers=['jsxhint']
 """ Key Bindings
 
 " ctrl+v - Allow raw pasting (without auto indents)
-nnoremap <C-v> :set invpaste paste?<CR>
-set pastetoggle=<C-v>
+map <leader>v :set invpaste paste?<CR>
+set pastetoggle=<leader>v
+
 set showmode
