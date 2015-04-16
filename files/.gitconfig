@@ -28,7 +28,7 @@
 	ri = rebase -i
 	rc = rebase --continue
 	ra = rebase --abort
-	g = grep
+	g = grep --perl-regexp
 	amend = commit --amend
 
 	# Get SHA1 hash of HEAD commit
