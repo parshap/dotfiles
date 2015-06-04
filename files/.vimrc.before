@@ -1,2 +1,22 @@
 " Set leader key to comma
 let mapleader=","
+
+" Disable plugins
+call janus#disable_plugin("ack")
+call janus#disable_plugin("ctrlp")
+call janus#disable_plugin("nerdcommenter")
+call janus#disable_plugin("nerdtree")
+call janus#disable_plugin("unimpaired")
+call janus#disable_plugin("tagbar")
+call janus#disable_plugin("narrowregion")
+call janus#disable_plugin("zoomwin")
+call janus#disable_plugin("buffergator")
+call janus#disable_plugin("vroom")
+call janus#disable_plugin("dispatch")
+call janus#disable_plugin("eunuch")
+call janus#disable_plugin("snipmate")
+call janus#disable_plugin("vim-snippets")
+call janus#disable_plugin("kwbd")
+call janus#disable_plugin("vimwiki")
+call janus#disable_plugin("visualstar")
+call janus#disable_plugin("webapi")
