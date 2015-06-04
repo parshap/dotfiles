@@ -61,6 +61,14 @@ autocmd! BufEnter *.jsx let b:syntastic_checkers=['jsxhint']
 map <leader>v :set invpaste paste?<CR>
 set pastetoggle=<leader>v
 
+" Bind <Leader>hs back to gitgutter, janus binds it to hlsearch toggle
+" gitgutter
+let g:gitgutter_map_keys = 0
+nmap ]h <Plug>GitGutterNextHunk
+nmap [h <Plug>GitGutterPrevHunk
+nmap <Leader>ha <Plug>GitGutterStageHunk
+nmap <Leader>hu <Plug>GitGutterRevertHunk
+
 " Resize window
 nnoremap <silent> <Leader>+ :exe "resize " . (winheight(0) * 3/2)<CR>
 nnoremap <silent> <Leader>- :exe "resize " . (winheight(0) * 2/3)<CR>
