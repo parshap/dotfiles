@@ -1,3 +1,6 @@
+" Hide buffers instead of closing
+set hidden
+
 " Use 256 colors.
 set t_Co=256
 
