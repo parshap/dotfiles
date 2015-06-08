@@ -31,10 +31,9 @@ set number
 " Show current mode in status bar (e.g., `-- INSERT --`)
 set showmode
 
-" ## File Types
-
-" `Jakefile` is javascript
+" Filetypes by filename
 autocmd BufNewFile,BufRead Jakefile setlocal filetype=javascript
+autocmd BufNewFile,BufRead .eslint setlocal filetype=json
 
 " ## Indentation
 
@@ -50,10 +49,9 @@ autocmd FileType markdown setlocal tabstop=2 softtabstop=2 shiftwidth=2 expandta
 autocmd FileType css setlocal tabstop=2 softtabstop=2 shiftwidth=2 expandtab
 autocmd FileType python setlocal tabstop=4 softtabstop=4 shiftwidth=4 expandtab
 
-" ## Syntastic Checkers
-
-" JavaScript
-autocmd! BufEnter *.jsx let b:syntastic_checkers=['jsxhint']
+" Syntastic checkers
+autocmd! BufEnter *.jsx let b:syntastic_checkers=['eslint']
+let g:syntastic_javascript_checkers = ['jshint']
 
 " ## Key Bindings
 
