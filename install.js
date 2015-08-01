@@ -8,7 +8,7 @@ var path = require("path"),
 
 var FILES_PATH = path.join(__dirname, "files");
 
-function link(file) {
+function link(file, callback) {
 	var rel = file.slice(FILES_PATH.length + 1),
 		dest = path.join(process.env.HOME, rel);
 
@@ -29,8 +29,10 @@ function link(file) {
 		doLink,
 	], function(err) {
 		if (err) throw err;
+		callback();
 	});
 }
 
+var queue = async.queue(link, 1);
 walkdir(FILES_PATH)
-	.on("file", link);
+	.on("file", queue.push.bind(queue));
