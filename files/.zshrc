@@ -72,13 +72,14 @@ alias n='npm'
 
 v() {
 	local command=$1
+	shift
 	# shift
 	case "$1" in
 		"s") command=status ;;
 		"u") command=up ;;
 		"p") command=provision ;;
 	esac
-	vagrant $command
+	vagrant $command $@
 }
 
 # Attach to tmux session
