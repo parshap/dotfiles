@@ -45,6 +45,28 @@ mocha () {
 	"$(git root)/node_modules/.bin/mocha" $@
 }
 
+# Expand in place
+expand-in-place() {
+	local OPTIND
+	local t=2
+	while getopts ":t:" opt
+	do
+		case $opt in
+			t)
+				t=$OPTARG
+				;;
+			\?)
+				echo "Invalid option: -$OPTARG" >&2
+				;;
+		esac
+	done
+	shift $OPTIND-1
+
+	for file in $@; do
+		expand -t $t $file | sponge $file
+	done
+}
+
 # Aliases
 alias n='npm'
 
