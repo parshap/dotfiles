@@ -15,8 +15,7 @@ zstyle :omz:plugins:ssh-agent id_rsa
 
 source $ZSH/oh-my-zsh.sh
 
-# PATH
-export PATH=$HOME/bin:/usr/local/bin:$PATH
+export PATH="$HOME/bin:/usr/local/bin:$PATH"
 
 # Add Brew ruby bin path to PATH
 brew_ruby_prefix=$(brew --prefix ruby 2>/dev/null)
