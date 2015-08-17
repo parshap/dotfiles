@@ -65,5 +65,8 @@
 	# Get the project root directory
 	root = !pwd
 
+	# Git log author=parshap
+	lme = "! git l --all --author=\"$(git config user.email)\""
+
 [color]
 	ui = true
