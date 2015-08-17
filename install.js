@@ -1,4 +1,3 @@
-/*jshint es5:true node:true globalstrict:true */
 "use strict";
 
 var path = require("path"),
@@ -27,12 +26,15 @@ function link(file, callback) {
 	async.series([
 		doUnlink,
 		doLink,
-	], function(err) {
-		if (err) throw err;
-		callback();
-	});
+	], callback);
 }
 
 var queue = async.queue(link, 1);
 walkdir(FILES_PATH)
-	.on("file", queue.push.bind(queue));
+	.on("file", function(file) {
+		queue.push(file, function(err) {
+			if (err) {
+				throw err;
+			}
+		});
+	});
