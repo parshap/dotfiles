@@ -13,6 +13,7 @@
 	# Simple shortcuts
 	s = status -sb
 	c = commit --verbose
+	ca = commit --amend --verbose
 	a = add
 	au = add --update
 	d = diff
