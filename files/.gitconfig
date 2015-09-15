@@ -68,5 +68,9 @@
 	# Git log author=parshap
 	lme = "! git l --all --author=\"$(git config user.email)\""
 
+	# Remove local branches that have been merged into master
+	# See http://ben.lobaugh.net/blog/201616/cleanup-and-remove-all-merged-local-and-remote-git-branches
+	remove-merged-branches = "! git branch --merged | grep -v \" master$\" | xargs -n 1 git branch -d"
+
 [color]
 	ui = true
