@@ -30,8 +30,11 @@ function link(file, callback) {
 }
 
 var queue = async.queue(link, 1);
-walkdir(FILES_PATH)
-	.on("file", function(file) {
+var options = {
+	no_recurse: true,
+};
+walkdir(FILES_PATH, options)
+	.on("path", function(file) {
 		queue.push(file, function(err) {
 			if (err) {
 				throw err;
