@@ -25,8 +25,8 @@
 	cp = cherry-pick
 	sm = submodule
 	smu = submodule update --init --recursive
-	r = rebase
-	ri = rebase -i
+	r = rebase --autostash
+	ri = rebase --interactive --autostash
 	rc = rebase --continue
 	ra = rebase --abort
 	g = grep --perl-regexp
