@@ -70,9 +70,8 @@ let g:syntastic_javascript_checkers = ['jshint']
 
 " ## Key Bindings
 
-" ctrl+v - Allow raw pasting (without auto indents)
-map <leader>v :set invpaste paste?<CR>
-set pastetoggle=<leader>v
+" Allow raw pasting (without auto indents)
+nnoremap <leader>v :set invpaste paste?<CR>
 
 " Bind <Leader>hs back to gitgutter, janus binds it to hlsearch toggle
 " gitgutter
