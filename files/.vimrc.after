@@ -16,6 +16,8 @@ set list listchars=tab:❘-,trail:·,extends:»,precedes:«,nbsp:×
 
 " Set a 80 column ruler
 set colorcolumn=80
+" Wrap text after 78th character
+set textwidth=78
 
 " Hide gui toolbar
 if has("gui_running")
@@ -30,6 +32,15 @@ set number
 
 " Show current mode in status bar (e.g., `-- INSERT --`)
 set showmode
+
+" Formatting Options
+" c = format comments
+" r = insert comment leader after <Enter> in insert mode
+" o = insert comment leader after 'o' or 'O' in normal mode
+" q = allow formatting of comments with "gq"
+" n = recognized numbered lists
+" j = remove comment leader when joining lines
+set formatoptions=croqnj
 
 " Add space after comments when using nerdcommenter
 let NERDSpaceDelims=1
