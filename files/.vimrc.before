@@ -4,7 +4,6 @@ let mapleader=","
 " Disable plugins
 call janus#disable_plugin("ack")
 call janus#disable_plugin("ctrlp")
-call janus#disable_plugin("nerdcommenter")
 call janus#disable_plugin("nerdtree")
 call janus#disable_plugin("unimpaired")
 call janus#disable_plugin("tagbar")

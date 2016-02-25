@@ -31,6 +31,9 @@ set number
 " Show current mode in status bar (e.g., `-- INSERT --`)
 set showmode
 
+" Add space after comments when using nerdcommenter
+let NERDSpaceDelims=1
+
 " Filetypes by filename
 autocmd BufNewFile,BufRead Jakefile setlocal filetype=javascript
 autocmd BufNewFile,BufRead .eslint setlocal filetype=json
