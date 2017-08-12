@@ -8,7 +8,7 @@ set t_Co=256
 set mouse=a
 
 " Set the colorscheme
-set background=dark
+set background=light
 colorscheme solarized
 
 " Set guides
