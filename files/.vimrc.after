@@ -21,7 +21,7 @@ set textwidth=78
 
 " Hide gui toolbar
 if has("gui_running")
-	set guioptions=egmrt
+  set guioptions=egmrt
 endif
 
 " Spell check
