@@ -18,13 +18,6 @@ source $ZSH/oh-my-zsh.sh
 export PATH="$HOME/bin:/usr/local/bin:$PATH"
 export EDITOR=vim
 
-# Add Brew ruby bin path to PATH
-brew_ruby_prefix=$(brew --prefix ruby 2>/dev/null)
-if [ $brew_ruby_prefix ]
-then
-	export PATH=$brew_ruby_prefix/bin:$PATH
-fi
-
 # Predictable SSH authentication socket location.
 # See http://qq.is/tutorial/2011/11/17/ssh-keys-through-screen.html
 SOCK="/tmp/ssh-agent-$USER"
