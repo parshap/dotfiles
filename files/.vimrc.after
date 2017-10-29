@@ -70,6 +70,11 @@ autocmd FileType python setlocal tabstop=4 softtabstop=4 shiftwidth=4 expandtab
 autocmd! BufEnter *.jsx let b:syntastic_checkers=['eslint']
 let g:syntastic_javascript_checkers = ['jshint']
 
+" Configure Syntastic. Lint on save, etc.
+let g:syntastic_auto_loc_list = 2
+let g:syntastic_check_on_open = 0
+let g:syntastic_mode_map = {'mode': 'active'}
+
 " ## Key Bindings
 
 " Allow raw pasting (without auto indents)
