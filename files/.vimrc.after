@@ -63,6 +63,7 @@ autocmd FileType yaml setlocal tabstop=2 softtabstop=2 shiftwidth=2 expandtab
 autocmd FileType markdown setlocal tabstop=2 softtabstop=2 shiftwidth=2 expandtab textwidth=72
 autocmd FileType json setlocal tabstop=2 softtabstop=2 shiftwidth=2 expandtab
 autocmd FileType css setlocal tabstop=2 softtabstop=2 shiftwidth=2 expandtab
+autocmd FileType less setlocal tabstop=2 softtabstop=2 shiftwidth=2 expandtab
 autocmd FileType python setlocal tabstop=4 softtabstop=4 shiftwidth=4 expandtab
 
 " Syntastic checkers
