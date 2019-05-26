@@ -74,9 +74,3 @@ v() {
 	esac
 	vagrant $command $@
 }
-
-# Attach to tmux session
-if [ "$TMUX" = "" ]
-then
-	tmux attach
-fi
