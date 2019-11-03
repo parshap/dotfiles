@@ -94,30 +94,6 @@ let g:ale_fixers = {
 \   'javascript': ['eslint'],
 \}
 
-
-" Syntastic checkers
-let g:syntastic_javascript_checkers = ['eslint', 'standard']
-
-" Point syntastic checker at locally installed `standard` if it exists.
-if executable('node_modules/.bin/eslint')
-  let g:syntastic_javascript_checkers = ['eslint']
-  let g:syntastic_javascript_eslint_exec = 'node_modules/.bin/eslint'
-endif
-
-" Point syntastic checker at locally installed `standard` if it exists.
-if executable('node_modules/.bin/standard')
-  let g:syntastic_javascript_checkers = ['standard']
-  let g:syntastic_javascript_standard_exec = 'node_modules/.bin/standard'
-endif
-
-let g:syntastic_javascript_checkers = ['eslint']
-let g:syntastic_javascript_eslint_exec = 'eslint_d'
-
-" Configure Syntastic. Lint on save, etc.
-let g:syntastic_auto_loc_list = 2
-let g:syntastic_check_on_open = 0
-let g:syntastic_mode_map = {'mode': 'active'}
-
 " ## Key Bindings
 
 " Allow raw pasting (without auto indents)
