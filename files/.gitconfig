@@ -20,6 +20,7 @@
 	dc = diff --cached
 	co = checkout
 	cob = checkout -b
+	coB = checkout -B
 	b = branch
 	f = fetch
 	cp = cherry-pick
