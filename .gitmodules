@@ -1,3 +1,15 @@
 [submodule "files/.janus/ale"]
 	path = files/.janus/ale
 	url = git@github.com:w0rp/ale.git
+[submodule "files/.janus/vim-jsx-pretty"]
+	path = files/.janus/vim-jsx-pretty
+	url = ssh://git@github.com/maxmellon/vim-jsx-pretty
+[submodule "files/.janus/vim-graphql"]
+	path = files/.janus/vim-graphql
+	url = ssh://git@github.com/jparise/vim-graphql
+[submodule "files/.janus/vim-js"]
+	path = files/.janus/vim-js
+	url = ssh://git@github.com/yuezk/vim-js
+[submodule "files/.janus/coc.nvim"]
+	path = files/.janus/coc.nvim
+	url = ssh://git@github.com/neoclide/coc.nvim
