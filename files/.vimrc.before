@@ -23,7 +23,7 @@ call janus#disable_plugin("narrowregion")
 " call janus#disable_plugin("nerdtree")
 call janus#disable_plugin("repeat")
 call janus#disable_plugin("snipmate")
-" call janus#disable_plugin("supertab")
+call janus#disable_plugin("supertab")
 " call janus#disable_plugin("surround")
 " Using Ale instead of Syntastic
 call janus#disable_plugin("syntastic")
