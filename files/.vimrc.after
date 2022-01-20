@@ -19,6 +19,23 @@ set colorcolumn=80
 " Wrap text after 78th character
 set textwidth=78
 
+" Some servers have issues with backup files, see https://github.com/neoclide/coc.nvim/issues/649
+set nobackup
+set nowritebackup
+
+" Give more space for displaying messages.
+set cmdheight=2
+
+" Having longer updatetime (default is 4000 ms = 4 s) leads to noticeable
+" delays and poor user experience.
+set updatetime=300
+
+" Don't pass messages to |ins-completion-menu|. -- From coc example config
+set shortmess+=c
+
+" Always show the signcolumn, otherwise it would shift the text each time
+set signcolumn=yes
+
 " Hide gui toolbar
 if has("gui_running")
   set guioptions=egmrt
@@ -58,9 +75,12 @@ set tabstop=4 softtabstop=4 shiftwidth=4 noexpandtab
 autocmd FileType html setlocal tabstop=2 softtabstop=2 shiftwidth=2 expandtab
 autocmd FileType ruby setlocal tabstop=2 softtabstop=2 shiftwidth=2 expandtab
 autocmd FileType coffee setlocal tabstop=2 softtabstop=2 shiftwidth=2 expandtab
+autocmd FileType vue setlocal tabstop=2 softtabstop=2 shiftwidth=2 expandtab
+autocmd FileType java setlocal tabstop=2 softtabstop=2 shiftwidth=2 expandtab
 autocmd FileType javascript setlocal tabstop=2 softtabstop=2 shiftwidth=2 expandtab
 autocmd FileType javascript.jsx setlocal tabstop=2 softtabstop=2 shiftwidth=2 expandtab
 autocmd FileType typescript setlocal tabstop=2 softtabstop=2 shiftwidth=2 expandtab
+autocmd FileType typescriptreact setlocal tabstop=2 softtabstop=2 shiftwidth=2 expandtab
 autocmd FileType yaml setlocal tabstop=2 softtabstop=2 shiftwidth=2 expandtab
 autocmd FileType markdown setlocal tabstop=2 softtabstop=2 shiftwidth=2 expandtab textwidth=72
 autocmd FileType json setlocal tabstop=2 softtabstop=2 shiftwidth=2 expandtab
