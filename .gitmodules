@@ -1,6 +1,3 @@
-[submodule "files/.janus/ale"]
-	path = files/.janus/ale
-	url = git@github.com:w0rp/ale.git
 [submodule "files/.janus/vim-jsx-pretty"]
 	path = files/.janus/vim-jsx-pretty
 	url = ssh://git@github.com/maxmellon/vim-jsx-pretty
