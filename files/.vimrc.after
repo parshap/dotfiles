@@ -36,12 +36,28 @@ set shortmess+=c
 " Always show the signcolumn, otherwise it would shift the text each time
 set signcolumn=yes
 
+" Use visual bells instead of sound
+set visualbell
+
 " Hide gui toolbar
 if has("gui_running")
   set guioptions=egmrt
 endif
 
-let g:coc_global_extensions = ['coc-tsserver', 'coc-json', 'coc-html', 'coc-css']
+let g:coc_global_extensions = [
+\  'coc-tsserver',
+\  'coc-eslint',
+\  'coc-vetur',
+\  'coc-json',
+\  'coc-yaml',
+\  'coc-html',
+\  'coc-css',
+\  'coc-markdownlint',
+\  'coc-prettier',
+\  'coc-highlight',
+\  'coc-spell-checker',
+\  'coc-pyright',
+\]
 
 " Spell check
 set spell
