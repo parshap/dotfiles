@@ -41,7 +41,7 @@ files=("$FILES_PATH"/*)
 if [ "$FORCE" = false ]; then
     errors=0
     for file in "${files[@]}"; do
-        [ -f "$file" ] || continue
+        [ -f "$file" ] || [ -d "$file" ] || continue
         dest="$HOME/$(basename "$file")"
         if ! can_link "$dest" "$file"; then
             echo "Error: $dest already exists and is not a managed symlink"
@@ -57,7 +57,7 @@ fi
 
 # Create the links
 for file in "${files[@]}"; do
-    [ -f "$file" ] || continue
+    [ -f "$file" ] || [ -d "$file" ] || continue
     rel="$(basename "$file")"
     dest="$HOME/$rel"
     ln -sf "$file" "$dest"
