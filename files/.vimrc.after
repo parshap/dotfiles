@@ -82,6 +82,7 @@ let NERDSpaceDelims=1
 
 " Filetypes by filename
 autocmd BufNewFile,BufRead Jakefile setlocal filetype=javascript
+autocmd BufRead,BufNewFile tsconfig.json setlocal filetype=jsonc
 autocmd BufNewFile,BufRead .eslint,.eslintrc,.babelrc setlocal filetype=json
 
 " ## Indentation
