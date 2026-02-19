@@ -1,9 +1,9 @@
 ## Installation
 
 ```sh
-$ make
+$ ./install.sh
 ```
 
 Creates a symlink in `$HOME` for each file in the `files` directory.
 
-**Warning**: Any existing files will be overwritten.
+Use `--force` or -`f` to overwrite existing files.
