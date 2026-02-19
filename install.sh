@@ -60,7 +60,7 @@ for file in "${files[@]}"; do
     [ -f "$file" ] || [ -d "$file" ] || continue
     rel="$(basename "$file")"
     dest="$HOME/$rel"
-    ln -sf "$file" "$dest"
+    ln -sfn "$file" "$dest"
     echo "Linked $rel -> $dest"
 done
 
