@@ -25,14 +25,12 @@ export EDITOR=vim
 # - -i case-insensitive search
 export LESS="-FRXi"
 
-# Predictable SSH authentication socket location.
+# Predictable SSH authentication socket location for tmux.
 # See http://qq.is/tutorial/2011/11/17/ssh-keys-through-screen.html
-SOCK="/tmp/ssh-agent-$USER"
-if test $SSH_AUTH_SOCK && [ $SSH_AUTH_SOCK != $SOCK ]
-then
-	rm -f /tmp/ssh-agent-$USER
-	ln -sf $SSH_AUTH_SOCK $SOCK
-	export SSH_AUTH_SOCK=$SOCK
+SOCK="$HOME/.ssh/ssh_auth_sock"
+if [ -n "$SSH_AUTH_SOCK" ] && [ "$SSH_AUTH_SOCK" != "$SOCK" ]; then
+	ln -sf "$SSH_AUTH_SOCK" "$SOCK"
+	export SSH_AUTH_SOCK="$SOCK"
 fi
 
 # Language
