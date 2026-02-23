@@ -18,6 +18,13 @@ source $ZSH/oh-my-zsh.sh
 export PATH="$HOME/bin:$HOME/.local/bin:/usr/local/bin:$PATH"
 export EDITOR=vim
 
+# Use the following arguments for `less`
+# - -F — quit immediately if content fits on one screen (just prints inline)
+# - -R — pass through ANSI color codes (needed for colored git output, etc.)
+# - -X — don't send terminal init/deinit sequences (prevents the alternate screen/clearing behavior)
+# - -i case-insensitive search
+export LESS="-FRXi"
+
 # Predictable SSH authentication socket location.
 # See http://qq.is/tutorial/2011/11/17/ssh-keys-through-screen.html
 SOCK="/tmp/ssh-agent-$USER"
