@@ -2,12 +2,13 @@
 
 # Path to your oh-my-zsh configuration
 ZSH=$HOME/.oh-my-zsh
+ZSH_CUSTOM=$HOME/.oh-my-zsh-custom
 
 # Set name of the theme to load
 ZSH_THEME="robbyrussell"
 
 # Plugins to load
-plugins=(git ssh-agent npm)
+plugins=(git ssh-agent npm you-should-use)
 
 # Load ssh-agent
 zstyle :omz:plugins:ssh-agent agent-forwarding on
