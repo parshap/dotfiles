@@ -108,6 +108,6 @@
 [column]
 	ui = auto
 [tag]
-	sort = version:sort
+	sort = version:refname
 [branch]
 	sort = -committerdate
