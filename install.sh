@@ -25,6 +25,13 @@ if [ ! -d "$FILES_PATH" ]; then
     exit 1
 fi
 
+# Decode __ in filenames to / in destination paths (e.g. bin__claude -> bin/claude)
+dest_path() {
+    local name
+    name="$(basename "$1")"
+    echo "$HOME/${name//__//}"
+}
+
 # Returns 0 if it's safe to create/overwrite the symlink at dest
 can_link() {
     local dest="$1" source="$2"
@@ -42,7 +49,7 @@ if [ "$FORCE" = false ]; then
     errors=0
     for file in "${files[@]}"; do
         [ -f "$file" ] || [ -d "$file" ] || continue
-        dest="$HOME/$(basename "$file")"
+        dest="$(dest_path "$file")"
         if ! can_link "$dest" "$file"; then
             echo "Error: $dest already exists and is not a managed symlink"
             errors=$((errors + 1))
@@ -58,10 +65,10 @@ fi
 # Create the links
 for file in "${files[@]}"; do
     [ -f "$file" ] || [ -d "$file" ] || continue
-    rel="$(basename "$file")"
-    dest="$HOME/$rel"
+    dest="$(dest_path "$file")"
+    mkdir -p "$(dirname "$dest")"
     ln -sfn "$file" "$dest"
-    echo "Linked $rel -> $dest"
+    echo "Linked $(basename "$file") -> $dest"
 done
 
 echo "Done!"
