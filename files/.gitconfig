@@ -31,12 +31,22 @@
 	ra = rebase --abort
 	g = grep --perl-regexp
 	amend = commit --amend
+	ap = add --patch
 	bu = branch --set-upstream-to
 
 	# Get SHA1 hash of HEAD commit
 	hash = rev-parse HEAD
 
 	p = pull
+	pu = push
+	puf = push --force-with-lease
+
+	# Stash
+	st = stash
+	stp = stash pop
+	sts = stash show --patch
+
+	cf = commit --fixup
 
 	# Merge always merges
 	m = merge --no-ff
@@ -95,5 +105,9 @@
 	conflictStyle = zdiff3
 [rerere]
 	enabled = true
+[column]
+	ui = auto
+[tag]
+	sort = version:sort
 [branch]
 	sort = -committerdate
