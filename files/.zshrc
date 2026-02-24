@@ -8,7 +8,7 @@ ZSH_CUSTOM=$HOME/.oh-my-zsh-custom
 ZSH_THEME="robbyrussell"
 
 # Plugins to load
-plugins=(git ssh-agent npm you-should-use)
+plugins=(git ssh-agent npm you-should-use zsh-autosuggestions zsh-syntax-highlighting)
 
 # Load ssh-agent
 zstyle :omz:plugins:ssh-agent agent-forwarding on
