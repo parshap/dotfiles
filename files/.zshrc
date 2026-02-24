@@ -7,7 +7,7 @@ ZSH=$HOME/.oh-my-zsh
 ZSH_THEME="robbyrussell"
 
 # Plugins to load
-plugins=(git vagrant ssh-agent compleat npm)
+plugins=(git ssh-agent npm)
 
 # Load ssh-agent
 zstyle :omz:plugins:ssh-agent agent-forwarding on
@@ -38,11 +38,6 @@ export LC_ALL=en_US.UTF-8
 export LANG=en_US.UTF-8
 export LANGUAGE=en_US.UTF-8
 
-# Mocha
-mocha () {
-	"$(git root)/node_modules/.bin/mocha" $@
-}
-
 # Expand in place
 expand-in-place() {
 	local OPTIND
@@ -68,14 +63,3 @@ expand-in-place() {
 # Aliases
 alias n='npm'
 
-v() {
-	local command=$1
-	shift
-	# shift
-	case "$1" in
-		"s") command=status ;;
-		"u") command=up ;;
-		"p") command=provision ;;
-	esac
-	vagrant $command $@
-}
