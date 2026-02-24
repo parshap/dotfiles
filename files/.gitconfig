@@ -12,8 +12,7 @@
 [alias]
 	# Simple shortcuts
 	s = status -sb
-	c = commit --verbose
-	ca = commit --amend --verbose
+	c = commit
 	a = add
 	au = add --update
 	d = diff
@@ -26,8 +25,8 @@
 	cp = cherry-pick
 	sm = submodule
 	smu = submodule update --init --recursive
-	r = rebase --autostash
-	ri = rebase --interactive --autostash --autosquash
+	r = rebase
+	ri = rebase --interactive
 	rc = rebase --continue
 	ra = rebase --abort
 	g = grep --perl-regexp
@@ -37,8 +36,7 @@
 	# Get SHA1 hash of HEAD commit
 	hash = rev-parse HEAD
 
-	# Don't let pull create merges
-	p = pull --ff-only
+	p = pull
 
 	# Merge always merges
 	m = merge --no-ff
@@ -59,7 +57,7 @@
 	# http://superuser.com/a/170828
 	fix = commit --amend -C HEAD
 
-	# "When you're a little worried taht the world is coming to an end"
+	# "When you're a little worried that the world is coming to an end"
 	# http://superuser.com/questions/169695/what-are-your-favorite-git-aliases/169702#169702
 	panic = !tar cvf ../git_panic.tar *
 
@@ -71,9 +69,31 @@
 
 	# Remove local branches that have been merged into master
 	# See http://ben.lobaugh.net/blog/201616/cleanup-and-remove-all-merged-local-and-remote-git-branches
-	remove-merged-branches = "! git branch --merged | grep -v \" master$\" | xargs -n 1 git branch -d"
+	remove-merged-branches = "! git branch --merged | grep -v \"\\* \\|main$\\|master$\" | xargs -n 1 git branch -d"
 
+[commit]
+	verbose = true
+[init]
+	defaultBranch = main
+[pull]
+	ff = only
+[push]
+	default = current
+	autoSetupRemote = true
+[fetch]
+	prune = true
+[rebase]
+	autoStash = true
+	autoSquash = true
+[diff]
+	algorithm = histogram
+	colorMoved = default
 [color]
 	ui = true
 [merge]
 	tool = vimdiff
+	conflictStyle = zdiff3
+[rerere]
+	enabled = true
+[branch]
+	sort = -committerdate
