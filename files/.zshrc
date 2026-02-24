@@ -61,6 +61,15 @@ expand-in-place() {
 	done
 }
 
+# Update date of current commit to help with chronological ordering
+git-date() {
+	local datecmd="date"
+	command -v gdate &>/dev/null && datecmd="gdate"
+	local date=$($datecmd -d "$1")
+	GIT_COMMITTER_DATE="$date" git commit --amend --no-edit --date "$date"
+}
+
 # Aliases
-alias n='npm'
+alias n='newt exec'
+alias ta='tmux attach'
 
