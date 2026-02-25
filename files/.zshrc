@@ -69,6 +69,13 @@ git-date() {
 	GIT_COMMITTER_DATE="$date" git commit --amend --no-edit --date "$date"
 }
 
+# Capture system claude alias for ~/bin/claude wrapper, then unalias
+# so the wrapper is found in PATH instead
+if (( $+aliases[claude] )); then
+	export CLAUDE_SYSTEM_CMD="${aliases[claude]}"
+	unalias claude
+fi
+
 # Aliases
 alias n='newt exec'
 alias ta='tmux attach'

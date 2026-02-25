@@ -104,11 +104,6 @@ def sync_theme():
 
 
 def main():
-    claude = find_real_claude()
-    if not claude:
-        print("Error: could not find claude binary in PATH", file=sys.stderr)
-        sys.exit(1)
-
     if sys.stdin.isatty() and sys.stdout.isatty():
         try:
             message = sync_theme()
@@ -117,7 +112,19 @@ def main():
         except Exception as e:
             print(f"Warning: terminal background detection failed: {e}", file=sys.stderr)
 
-    os.execv(claude, [claude] + sys.argv[1:])
+    system_cmd = os.environ.get("CLAUDE_SYSTEM_CMD")
+    if system_cmd:
+        # Exec through the system wrapper (e.g. newt), which resolves the
+        # real claude binary internally (no PATH lookup, no recursion).
+        import shlex
+        args = shlex.split(system_cmd) + sys.argv[1:]
+        os.execvp(args[0], args)
+    else:
+        claude = find_real_claude()
+        if not claude:
+            print("Error: could not find claude binary in PATH", file=sys.stderr)
+            sys.exit(1)
+        os.execv(claude, [claude] + sys.argv[1:])
 
 
 if __name__ == "__main__":
