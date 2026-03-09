@@ -76,6 +76,25 @@ if (( $+aliases[claude] )); then
 	unalias claude
 fi
 
+# Reset terminal state before each prompt. When SSH disconnects abruptly
+# (e.g., laptop sleep), the terminal can be left with stale modes enabled
+# because the remote application never sent the escape sequences to disable
+# them. This is a no-op when the modes are already off.
+#
+# Resets:
+#   \e[?1l     - Normal cursor keys (vs application mode)
+#   \e[?25h    - Show cursor (in case it was hidden)
+#   \e[?1000l  - Disable normal mouse tracking
+#   \e[?1002l  - Disable button-event mouse tracking
+#   \e[?1003l  - Disable all-motion mouse tracking
+#   \e[?1006l  - Disable SGR extended mouse mode
+#   \e[?2004l  - Disable bracketed paste mode
+_reset_terminal_modes() {
+	printf '\e[?1l\e[?25h\e[?1000l\e[?1002l\e[?1003l\e[?1006l\e[?2004l'
+}
+precmd_functions+=(_reset_terminal_modes)
+>>>>>>> eb945fd (Reset terminal state automatically)
+
 # Aliases
 alias n='newt exec'
 alias ta='tmux attach'
