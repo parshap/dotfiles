@@ -95,6 +95,11 @@ _reset_terminal_modes() {
 precmd_functions+=(_reset_terminal_modes)
 >>>>>>> eb945fd (Reset terminal state automatically)
 
+# Auto-attach to tmux on SSH login
+if [ -z "$TMUX" ] && [ -n "$SSH_CONNECTION" ]; then
+	tmux new-session -A -s main
+fi
+
 # Aliases
 alias n='newt exec'
 alias ta='tmux attach'
