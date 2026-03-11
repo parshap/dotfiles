@@ -97,7 +97,9 @@
 	autoSquash = true
 [diff]
 	algorithm = histogram
-	colorMoved = default
+	colorMoved = zebra
+	colorMovedWS = allow-indentation-change
+	wsErrorHighlight = all
 [color]
 	ui = true
 [merge]
