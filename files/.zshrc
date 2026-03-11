@@ -94,12 +94,15 @@ _reset_terminal_modes() {
 }
 precmd_functions+=(_reset_terminal_modes)
 
-# Auto-attach to tmux on SSH login
-if [ -z "$TMUX" ] && [ -n "$SSH_CONNECTION" ]; then
-	tmux new-session -A -s main
-fi
-
 # Aliases
 alias n='newt exec'
 alias ta='tmux attach'
 
+# Auto-attach to tmux. Only when:
+# - It's an SSH connection
+# - Not already in tmux
+# - It's an interactive shell
+if [ -z "$TMUX" ] && [ -n "$SSH_CONNECTION" ] && [ -n "$PS1" ]; then
+	tmux new-session -A -s main && exit || \
+		echo "tmux exited with an error"
+fi
