@@ -102,7 +102,15 @@ alias ta='tmux attach'
 # - It's an SSH connection
 # - Not already in tmux
 # - It's an interactive shell
-if [ -z "$TMUX" ] && [ -n "$SSH_CONNECTION" ] && [ -n "$PS1" ]; then
-	tmux new-session -A -s main && exit || \
-		echo "tmux exited with an error"
-fi
+#
+# This is deferred via precmd so it runs after the entire .zshrc has been
+# sourced. This solves for homebrew adding PATH modifications to the end of
+# .zshrc.
+_tmux_auto_attach() {
+	precmd_functions=(${precmd_functions:#_tmux_auto_attach})
+	if [ -z "$TMUX" ] && [ -n "$SSH_CONNECTION" ] && [ -n "$PS1" ]; then
+		tmux new-session -A -s main && exit || \
+			echo "tmux exited with an error"
+	fi
+}
+precmd_functions+=(_tmux_auto_attach)
