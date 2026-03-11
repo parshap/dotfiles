@@ -93,7 +93,6 @@ _reset_terminal_modes() {
 	printf '\e[?1l\e[?25h\e[?1000l\e[?1002l\e[?1003l\e[?1006l\e[?2004l'
 }
 precmd_functions+=(_reset_terminal_modes)
->>>>>>> eb945fd (Reset terminal state automatically)
 
 # Auto-attach to tmux on SSH login
 if [ -z "$TMUX" ] && [ -n "$SSH_CONNECTION" ]; then
