@@ -25,7 +25,7 @@ if [ ! -d "$FILES_PATH" ]; then
     exit 1
 fi
 
-# Decode __ in filenames to / in destination paths (e.g. bin__claude -> bin/claude)
+# Decode __ in filenames to / in destination paths (e.g. bin__foo -> bin/foo)
 dest_path() {
     local name
     name="$(basename "$1")"
