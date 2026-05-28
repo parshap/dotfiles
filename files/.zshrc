@@ -91,6 +91,13 @@ precmd_functions+=(_reset_terminal_modes)
 alias n='newt exec'
 alias ta='tmux attach'
 
+# Auto-update the dotfiles repo in the background, once per day.
+# Provided by ~/bin/dotfiles-update (managed by this repo).
+# Set DOTFILES_AUTO_UPDATE=0 to disable.
+if [ "${DOTFILES_AUTO_UPDATE:-1}" != "0" ] && command -v dotfiles-update >/dev/null 2>&1; then
+	dotfiles-update --shell-hook
+fi
+
 # Auto-attach to tmux. Only when:
 # - It's an SSH connection
 # - Not already in tmux

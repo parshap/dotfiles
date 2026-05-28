@@ -1,0 +1,98 @@
+#!/usr/bin/env bash
+# dotfiles-update: pull upstream changes, replay local edits, re-link.
+#
+# Modes:
+#   dotfiles-update              Run synchronously; outcome prints to stdout.
+#   dotfiles-update --shell-hook For shell rc files: prints any notice left by
+#                                the previous background run, then (if a full
+#                                day has passed) spawns an update in the
+#                                background and returns immediately.
+
+set -u
+
+# DOTFILES_LABEL identifies the repo being managed; used to namespace state
+# files and the notice prefix so multiple repos can be auto-updated side by
+# side (e.g. a public dotfiles repo plus a work-specific one that builds on
+# it). DOTFILES_DIR points at the repo's working tree.
+LABEL="${DOTFILES_LABEL:-dotfiles}"
+DOTFILES_DIR="${DOTFILES_DIR:-$HOME/dotfiles}"
+STATE_DIR="${XDG_CACHE_HOME:-$HOME/.cache}/${LABEL}-update"
+LOG_FILE="$STATE_DIR/log"
+NOTICE_FILE="$STATE_DIR/notice"
+STAMP_FILE="$STATE_DIR/last-check"
+
+mkdir -p "$STATE_DIR"
+
+case "${1:-}" in
+    --shell-hook)
+        if [ -s "$NOTICE_FILE" ]; then
+            cat "$NOTICE_FILE"
+            rm -f "$NOTICE_FILE"
+        fi
+        today=$(date +%Y-%m-%d)
+        [ -f "$STAMP_FILE" ] && [ "$(cat "$STAMP_FILE" 2>/dev/null)" = "$today" ] && exit 0
+        echo "$today" > "$STAMP_FILE"
+        # Detach: subshell+background reparents to init; works in bash and zsh.
+        ("$0" --background >/dev/null 2>&1 &)
+        exit 0
+        ;;
+    --background) BACKGROUND=1 ;;
+    "")           BACKGROUND=0 ;;
+    *)            echo "usage: dotfiles-update [--shell-hook]" >&2; exit 2 ;;
+esac
+
+# Report a one-line outcome. In background mode, written to NOTICE_FILE for
+# the next --shell-hook to display; in synchronous mode, printed to stdout.
+notice() {
+    local msg="[$LABEL] $*"
+    if [ "$BACKGROUND" = "1" ]; then
+        echo "$msg" > "$NOTICE_FILE"
+    else
+        echo "$msg"
+    fi
+}
+die() { notice "$@"; exit 1; }
+
+cd "$DOTFILES_DIR" 2>/dev/null || die "$DOTFILES_DIR not found"
+: > "$LOG_FILE"
+
+git fetch --quiet 2>>"$LOG_FILE" || die "git fetch failed (see $LOG_FILE)"
+
+LOCAL_HEAD=$(git rev-parse HEAD)
+REMOTE_HEAD=$(git rev-parse '@{u}' 2>/dev/null) || exit 0
+
+if [ "$LOCAL_HEAD" = "$REMOTE_HEAD" ]; then
+    [ "$BACKGROUND" = "1" ] || notice "already up to date"
+    exit 0
+fi
+
+# Stash any uncommitted changes (tracked + untracked) so we can fast-forward
+# cleanly and replay them on top. If anything goes wrong, we roll back to
+# $LOCAL_HEAD and restore the stash so the user's tree is exactly as before.
+STASH_CREATED=0
+if [ -n "$(git status --porcelain)" ]; then
+    git stash push --include-untracked --quiet -m "dotfiles-auto-update" 2>>"$LOG_FILE" \
+        || die "couldn't stash local changes (see $LOG_FILE)"
+    STASH_CREATED=1
+fi
+
+if ! git merge --ff-only --quiet "$REMOTE_HEAD" 2>>"$LOG_FILE"; then
+    # Local has unpushed commits or has diverged. Restore the stash and bail.
+    [ "$STASH_CREATED" = "1" ] && git stash pop --quiet >>"$LOG_FILE" 2>&1
+    die "cannot fast-forward — local diverged or has unpushed commits (see $LOG_FILE)"
+fi
+
+if [ "$STASH_CREATED" = "1" ] && ! git stash pop --quiet 2>>"$LOG_FILE"; then
+    # Conflict between upstream changes and local edits. Roll the merge back
+    # and reapply the stash on the original HEAD (where it applies cleanly).
+    # `git clean -fd` removes untracked files the failed pop partially
+    # restored — safe because the stash with -u captured them all.
+    git reset --hard --quiet "$LOCAL_HEAD" >>"$LOG_FILE" 2>&1
+    git clean -fd --quiet >>"$LOG_FILE" 2>&1
+    git stash pop --quiet >>"$LOG_FILE" 2>&1
+    die "upstream conflicts with local edits; rolled back to $(git rev-parse --short "$LOCAL_HEAD") (see $LOG_FILE)"
+fi
+
+./install.sh >>"$LOG_FILE" 2>&1 || die "install.sh failed (see $LOG_FILE)"
+
+notice "updated $(git rev-parse --short "$LOCAL_HEAD") -> $(git rev-parse --short HEAD)"
