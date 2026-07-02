@@ -16,6 +16,11 @@ zstyle :omz:plugins:ssh-agent id_rsa
 
 source $ZSH/oh-my-zsh.sh
 
+# Keep PATH entries unique (first occurrence wins). This neutralizes duplicate
+# entries that accumulate when login+interactive shells nest (tmux, subshells,
+# tool-spawned shells) and re-run the unconditional `PATH=...:$PATH` prepends below.
+typeset -U path PATH
+
 export PATH="$HOME/bin:$HOME/.local/bin:/usr/local/bin:$PATH"
 export EDITOR=vim
 
