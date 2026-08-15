@@ -1,0 +1,15 @@
+[
+  { "op": "add", "path": "/effortLevel", "value": "xhigh" },
+  { "op": "add", "path": "/showClearContextOnPlanAccept", "value": true },
+  { "op": "add", "path": "/skipAutoPermissionPrompt", "value": true },
+  { "op": "add", "path": "/skipWorkflowUsageWarning", "value": true },
+  {
+    "op": "add",
+    "path": "/statusLine",
+    "value": {
+      "type": "command",
+      "command": "~/.claude/statusline.sh"
+    }
+  },
+  { "op": "add", "path": "/theme", "value": "auto" }
+]

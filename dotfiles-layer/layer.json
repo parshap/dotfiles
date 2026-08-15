@@ -1,0 +1,162 @@
+{
+  "version": 1,
+  "name": "personal",
+  "priority": 10,
+  "targets": {
+    "pi-agents": {
+      "strategy": "concat",
+      "path": "~/.pi/agent/AGENTS.md",
+      "mode": "0644"
+    },
+    "pi-keybindings": {
+      "strategy": "symlink",
+      "path": "~/.pi/agent/keybindings.json"
+    },
+    "pi-mcp": {
+      "strategy": "json-patch",
+      "path": "~/.pi/agent/mcp.json",
+      "base": "empty",
+      "mode": "0600"
+    },
+    "pi-mcp-client": {
+      "strategy": "symlink",
+      "path": "~/.pi/agent/mcp-client.yaml"
+    },
+    "pi-settings": {
+      "strategy": "json-patch",
+      "path": "~/.pi/agent/settings.json",
+      "base": "empty",
+      "preserve": [
+        "/lastChangelogVersion"
+      ],
+      "mode": "0600"
+    },
+    "pi-statusline-config": {
+      "strategy": "json-patch",
+      "path": "~/.pi/agent/statusline.json",
+      "base": "empty",
+      "mode": "0600"
+    },
+    "pi-tool-manager": {
+      "strategy": "symlink",
+      "path": "~/.pi/agent/tool-manager.json"
+    },
+    "claude-instructions": {
+      "strategy": "concat",
+      "path": "~/.claude/CLAUDE.md",
+      "mode": "0644"
+    },
+    "claude-settings": {
+      "strategy": "json-patch",
+      "path": "~/.claude/settings.json",
+      "base": "live",
+      "mode": "0600"
+    },
+    "pi-extension-refresh-screen": {
+      "strategy": "symlink",
+      "path": "~/.pi/agent/extensions/refresh-screen.ts"
+    },
+    "pi-extension-statusline": {
+      "strategy": "symlink",
+      "path": "~/.pi/agent/extensions/statusline.ts"
+    },
+    "pi-extension-skill-projection-index": {
+      "strategy": "symlink",
+      "path": "~/.pi/agent/extensions/skill-projection/index.ts"
+    },
+    "pi-extension-skill-projection-readme": {
+      "strategy": "symlink",
+      "path": "~/.pi/agent/extensions/skill-projection/README.md"
+    },
+    "pi-lib-statusline-core": {
+      "strategy": "symlink",
+      "path": "~/.pi/agent/lib/statusline-core.mjs"
+    },
+    "pi-lib-statusline-promotions": {
+      "strategy": "symlink",
+      "path": "~/.pi/agent/lib/statusline-promotions.mjs"
+    },
+    "pi-lib-statusline-claude": {
+      "strategy": "symlink",
+      "path": "~/.pi/agent/lib/statusline-claude.mjs"
+    },
+    "zsh-fragments": {
+      "strategy": "native-include",
+      "app": "zsh"
+    },
+    "git-fragments": {
+      "strategy": "native-include",
+      "app": "git"
+    },
+    "tmux-fragments": {
+      "strategy": "native-include",
+      "app": "tmux"
+    }
+  },
+  "contributions": [
+    {
+      "target": "claude-instructions",
+      "path": "claude/CLAUDE.md"
+    },
+    {
+      "target": "pi-agents",
+      "path": "pi/AGENTS.md"
+    },
+    {
+      "target": "pi-keybindings",
+      "path": "pi/keybindings.json"
+    },
+    {
+      "target": "pi-mcp",
+      "path": "pi/mcp.patch.json"
+    },
+    {
+      "target": "pi-mcp-client",
+      "path": "pi/mcp-client.yaml"
+    },
+    {
+      "target": "pi-settings",
+      "path": "pi/settings.patch.json"
+    },
+    {
+      "target": "pi-statusline-config",
+      "path": "pi/statusline.patch.json"
+    },
+    {
+      "target": "pi-tool-manager",
+      "path": "pi/tool-manager.json"
+    },
+    {
+      "target": "claude-settings",
+      "path": "claude/settings.patch.json"
+    },
+    {
+      "target": "pi-extension-refresh-screen",
+      "path": "pi/extensions/refresh-screen.ts"
+    },
+    {
+      "target": "pi-extension-statusline",
+      "path": "pi/extensions/statusline.ts"
+    },
+    {
+      "target": "pi-extension-skill-projection-index",
+      "path": "pi/extensions/skill-projection/index.ts"
+    },
+    {
+      "target": "pi-extension-skill-projection-readme",
+      "path": "pi/extensions/skill-projection/README.md"
+    },
+    {
+      "target": "pi-lib-statusline-core",
+      "path": "pi/lib/statusline-core.mjs"
+    },
+    {
+      "target": "pi-lib-statusline-promotions",
+      "path": "pi/lib/statusline-promotions.mjs"
+    },
+    {
+      "target": "pi-lib-statusline-claude",
+      "path": "pi/lib/statusline-claude.mjs"
+    }
+  ]
+}
