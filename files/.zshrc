@@ -93,7 +93,6 @@ _reset_terminal_modes() {
 precmd_functions+=(_reset_terminal_modes)
 
 # Aliases
-alias n='newt exec'
 alias ta='tmux attach'
 
 # Auto-update the dotfiles repo in the background, once per day.
@@ -119,3 +118,19 @@ _tmux_auto_attach() {
 	fi
 }
 precmd_functions+=(_tmux_auto_attach)
+
+# Load active dotfiles-layer fragments. Extend via a source listed by
+# `dotfiles-layer explain zsh-fragments`; the compositor projects ordered
+# symlinks into this directory.
+if [[ -n "${XDG_STATE_HOME:-}" && "$XDG_STATE_HOME" = /* ]]; then
+	_dotfiles_layer_state_home="$XDG_STATE_HOME"
+else
+	_dotfiles_layer_state_home="$HOME/.local/state"
+fi
+_dotfiles_layer_zsh_dir="$_dotfiles_layer_state_home/dotfiles-layer/native/zsh-fragments/fragments"
+if [[ -d "$_dotfiles_layer_zsh_dir" ]]; then
+	for _dotfiles_layer_fragment in "$_dotfiles_layer_zsh_dir"/*.zsh(N); do
+		source "$_dotfiles_layer_fragment"
+	done
+fi
+unset _dotfiles_layer_fragment _dotfiles_layer_state_home _dotfiles_layer_zsh_dir

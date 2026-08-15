@@ -1,0 +1,23 @@
+{
+  "name": "dotfiles-layer",
+  "version": "1.0.0",
+  "private": true,
+  "description": "A conservative layered dotfiles compositor",
+  "type": "module",
+  "bin": {
+    "dotfiles-layer": "src/cli.js"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "bootstrap": "./bootstrap.sh",
+    "test": "node --test test/*.test.mjs"
+  },
+  "license": "MIT",
+  "dependencies": {
+    "ajv": "8.20.0",
+    "fast-json-patch": "3.1.1",
+    "json-merge-patch": "1.0.2"
+  }
+}

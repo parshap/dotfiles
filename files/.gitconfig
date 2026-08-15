@@ -81,6 +81,8 @@
 	# See http://ben.lobaugh.net/blog/201616/cleanup-and-remove-all-merged-local-and-remote-git-branches
 	remove-merged-branches = "! git branch --merged | grep -v \"\\* \\|main$\\|master$\" | xargs -n 1 git branch -d"
 
+	uncommit = "!f() { last_commit_hash=$(git rev-parse HEAD); git reset --soft HEAD~1; for file in \"$@\"; do git restore --staged $file; done; git commit --reuse-message=$last_commit_hash; }; f"
+
 [commit]
 	verbose = true
 [init]
@@ -113,3 +115,8 @@
 	sort = version:refname
 [branch]
 	sort = -committerdate
+
+# Active layered Git fragments. Extend via a source listed by
+# `dotfiles-layer explain git-fragments`; Git performs final composition.
+[include]
+	path = ~/.local/state/dotfiles-layer/native/git-fragments/loader.gitconfig

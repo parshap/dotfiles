@@ -23,6 +23,10 @@ STAMP_FILE="$STATE_DIR/last-check"
 
 mkdir -p "$STATE_DIR"
 
+# Both the personal and private updaters can touch the public checkout during
+# installation. Serialize complete update/install runs across labels.
+GLOBAL_LOCK_DIR="${XDG_CACHE_HOME:-$HOME/.cache}/dotfiles-update-install.lock"
+
 case "${1:-}" in
     --shell-hook)
         if [ -s "$NOTICE_FILE" ]; then
@@ -52,6 +56,25 @@ notice() {
     fi
 }
 die() { notice "$@"; exit 1; }
+
+acquire_global_lock() {
+    local attempts=0 owner
+    while ! mkdir "$GLOBAL_LOCK_DIR" 2>/dev/null; do
+        owner="$(cat "$GLOBAL_LOCK_DIR/pid" 2>/dev/null || true)"
+        if [ -n "$owner" ] && ! kill -0 "$owner" 2>/dev/null; then
+            rm -rf "$GLOBAL_LOCK_DIR"
+            continue
+        fi
+        attempts=$((attempts + 1))
+        [ "$attempts" -lt 120 ] || die "timed out waiting for another dotfiles update"
+        sleep 1
+    done
+    echo "$$" > "$GLOBAL_LOCK_DIR/pid"
+    trap 'rm -rf "$GLOBAL_LOCK_DIR"' EXIT
+    trap 'exit 130' HUP INT TERM
+}
+
+acquire_global_lock
 
 cd "$DOTFILES_DIR" 2>/dev/null || die "$DOTFILES_DIR not found"
 : > "$LOG_FILE"

@@ -1,0 +1,20 @@
+#!/bin/sh
+set -eu
+
+SOURCE=$0
+while [ -L "$SOURCE" ]; do
+  SOURCE_DIR=$(CDPATH= cd -- "$(dirname -- "$SOURCE")" && pwd -P)
+  LINK=$(readlink "$SOURCE")
+  case "$LINK" in
+    /*) SOURCE=$LINK ;;
+    *) SOURCE=$SOURCE_DIR/$LINK ;;
+  esac
+done
+SOURCE_DIR=$(CDPATH= cd -- "$(dirname -- "$SOURCE")" && pwd -P)
+CLI=$SOURCE_DIR/../dotfiles-layer/src/cli.js
+
+if [ ! -f "$CLI" ]; then
+  echo "dotfiles-layer: package CLI not found at $CLI" >&2
+  exit 1
+fi
+exec node "$CLI" "$@"
