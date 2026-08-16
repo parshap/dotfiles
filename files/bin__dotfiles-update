@@ -3,10 +3,15 @@
 #
 # Modes:
 #   dotfiles-update              Run synchronously; outcome prints to stdout.
-#   dotfiles-update --shell-hook For shell rc files: prints any notice left by
-#                                the previous background run, then (if a full
-#                                day has passed) spawns an update in the
-#                                background and returns immediately.
+#   dotfiles-update --shell-hook For shell rc files: prints any notices left by
+#                                previous background runs, then (if a full day
+#                                has passed) spawns an update in the background
+#                                and returns immediately.
+#
+# Background runs append one-line notices to a file surfaced at the next shell
+# start. A run that finds nothing to report — no update, clean working tree,
+# clean composed config — stays silent; anything else leaves a notice.
+# Logs are kept per day under $STATE_DIR and pruned after a week.
 
 set -u
 
@@ -17,11 +22,16 @@ set -u
 LABEL="${DOTFILES_LABEL:-dotfiles}"
 DOTFILES_DIR="${DOTFILES_DIR:-$HOME/dotfiles}"
 STATE_DIR="${XDG_CACHE_HOME:-$HOME/.cache}/${LABEL}-update"
-LOG_FILE="$STATE_DIR/log"
+LOG_FILE="$STATE_DIR/log.$(date +%Y-%m-%d)"
 NOTICE_FILE="$STATE_DIR/notice"
 STAMP_FILE="$STATE_DIR/last-check"
+# Lock-wait budget in seconds; overridable for tests. A holder running a full
+# install (which may include package-manager work) can legitimately hold the
+# lock for minutes.
+LOCK_ATTEMPTS="${DOTFILES_UPDATE_LOCK_ATTEMPTS:-120}"
 
 mkdir -p "$STATE_DIR"
+find "$STATE_DIR" -name 'log.*' -mtime +7 -delete 2>/dev/null || true
 
 # Both the personal and private updaters can touch the public checkout during
 # installation. Serialize complete update/install runs across labels.
@@ -45,33 +55,103 @@ case "${1:-}" in
     *)            echo "usage: dotfiles-update [--shell-hook]" >&2; exit 2 ;;
 esac
 
-# Report a one-line outcome. In background mode, written to NOTICE_FILE for
+# Report a one-line outcome. In background mode, appended to NOTICE_FILE for
 # the next --shell-hook to display; in synchronous mode, printed to stdout.
 notice() {
     local msg="[$LABEL] $*"
     if [ "$BACKGROUND" = "1" ]; then
-        echo "$msg" > "$NOTICE_FILE"
+        echo "$msg" >> "$NOTICE_FILE"
     else
         echo "$msg"
     fi
 }
 die() { notice "$@"; exit 1; }
 
+release_global_lock() {
+    # Never remove a lock whose ownership is unverified: a reclaimer may have
+    # replaced our stale lock with its own live one.
+    [ "$(cat "$GLOBAL_LOCK_DIR/pid" 2>/dev/null)" = "$$" ] && rm -rf "$GLOBAL_LOCK_DIR"
+}
+
+# Liveness check that fails closed: only ESRCH ("no such process") proves the
+# owner is gone. EPERM (another user's process, or a sandbox denying signals)
+# means "alive or unknowable", so we keep waiting rather than reclaiming a
+# live lock.
+owner_is_dead() {
+    local err
+    if kill -0 "$1" 2>/dev/null; then return 1; fi
+    err="$(kill -0 "$1" 2>&1)"
+    case "$err" in
+        *"No such process"*) return 0 ;;
+        *) return 1 ;;
+    esac
+}
+
 acquire_global_lock() {
-    local attempts=0 owner
+    local attempts=0 owner reclaim stale_dir
     while ! mkdir "$GLOBAL_LOCK_DIR" 2>/dev/null; do
+        reclaim=0
         owner="$(cat "$GLOBAL_LOCK_DIR/pid" 2>/dev/null || true)"
-        if [ -n "$owner" ] && ! kill -0 "$owner" 2>/dev/null; then
-            rm -rf "$GLOBAL_LOCK_DIR"
+        if [ -n "$owner" ]; then
+            owner_is_dead "$owner" && reclaim=1
+        else
+            # No pid recorded: the holder may be between mkdir and writing its
+            # pid, so only reclaim a lock dir that has been sitting around.
+            [ -n "$(find "$GLOBAL_LOCK_DIR" -maxdepth 0 -mmin +1 2>/dev/null)" ] && reclaim=1
+        fi
+        if [ "$reclaim" = "1" ]; then
+            # Atomic reclaim: exactly one waiter can win the rename.
+            stale_dir="$GLOBAL_LOCK_DIR.stale.$$.$RANDOM"
+            if mv "$GLOBAL_LOCK_DIR" "$stale_dir" 2>/dev/null; then
+                rm -rf "$stale_dir"
+            fi
             continue
         fi
         attempts=$((attempts + 1))
-        [ "$attempts" -lt 120 ] || die "timed out waiting for another dotfiles update"
+        if [ "$attempts" -ge "$LOCK_ATTEMPTS" ]; then
+            # Pure contention, not a failure: clear the day stamp so the next
+            # shell start retries instead of silently skipping the day.
+            rm -f "$STAMP_FILE"
+            die "timed out waiting for another dotfiles update"
+        fi
         sleep 1
     done
     echo "$$" > "$GLOBAL_LOCK_DIR/pid"
-    trap 'rm -rf "$GLOBAL_LOCK_DIR"' EXIT
+    trap 'release_global_lock' EXIT
     trap 'exit 130' HUP INT TERM
+}
+
+# Surface noteworthy local state: uncommitted files in the repo (often host
+# tooling writing through managed symlinks) and composed-config drift. Prints
+# nothing when everything is clean.
+report_health() {
+    local parts="" dirty_count check_output drifted self_dir compositor self_source self_link
+    dirty_count="$(git status --porcelain 2>/dev/null | wc -l | tr -d ' ')"
+    if [ "$dirty_count" != "0" ]; then
+        parts="$dirty_count uncommitted file(s) (see: git -C \"$DOTFILES_DIR\" status)"
+    fi
+    # This script is normally invoked through its ~/bin symlink (and re-exec'd
+    # by name by wrapper labels), so resolve links before locating the
+    # compositor launcher that sits next to the real script.
+    self_source="${BASH_SOURCE[0]}"
+    while [ -L "$self_source" ]; do
+        self_dir="$(cd "$(dirname "$self_source")" && pwd -P)"
+        self_link="$(readlink "$self_source")"
+        case "$self_link" in
+            /*) self_source="$self_link" ;;
+            *)  self_source="$self_dir/$self_link" ;;
+        esac
+    done
+    self_dir="$(cd "$(dirname "$self_source")" && pwd -P)"
+    compositor="$self_dir/bin__dotfiles-layer"
+    if [ -f "$compositor" ]; then
+        if ! check_output="$("$compositor" check 2>&1)"; then
+            drifted="$(printf '%s\n' "$check_output" | awk -F: '/: (different|missing|stale)/ {print $1}' | paste -sd, -)"
+            parts="${parts:+$parts; }composed config needs attention: ${drifted:-run dotfiles-layer check}"
+        fi
+    fi
+    [ -n "$parts" ] && notice "$parts"
+    return 0
 }
 
 acquire_global_lock
@@ -79,13 +159,32 @@ acquire_global_lock
 cd "$DOTFILES_DIR" 2>/dev/null || die "$DOTFILES_DIR not found"
 : > "$LOG_FILE"
 
+# Restore local edits a previous run left in the stash (e.g. it was killed
+# between stashing and replaying). Do this first so the normal flow below
+# treats recovered edits like any other local change.
+remnant="$(git stash list --format='%gd %gs' 2>/dev/null | awk '/dotfiles-auto-update/ {print $1; exit}')"
+if [ -n "$remnant" ]; then
+    if [ -n "$(git status --porcelain)" ]; then
+        die "a previous auto-update left local edits in the stash ($remnant) and the working tree has new changes; resolve manually: git -C \"$DOTFILES_DIR\" stash pop $remnant"
+    fi
+    if git stash pop --quiet "$remnant" 2>>"$LOG_FILE"; then
+        notice "recovered local edits left in the stash by a previous interrupted update"
+    else
+        git reset --hard --quiet >>"$LOG_FILE" 2>&1
+        git clean -fd --quiet >>"$LOG_FILE" 2>&1
+        die "local edits from a previous interrupted update remain in the stash ($remnant) and no longer apply cleanly; resolve manually: git -C \"$DOTFILES_DIR\" stash pop $remnant"
+    fi
+fi
+
 git fetch --quiet 2>>"$LOG_FILE" || die "git fetch failed (see $LOG_FILE)"
 
 LOCAL_HEAD=$(git rev-parse HEAD)
-REMOTE_HEAD=$(git rev-parse '@{u}' 2>/dev/null) || exit 0
+REMOTE_HEAD=$(git rev-parse '@{u}' 2>/dev/null) \
+    || die "no upstream configured for $(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo HEAD); update skipped"
 
 if [ "$LOCAL_HEAD" = "$REMOTE_HEAD" ]; then
     [ "$BACKGROUND" = "1" ] || notice "already up to date"
+    report_health
     exit 0
 fi
 
@@ -101,7 +200,13 @@ fi
 
 if ! git merge --ff-only --quiet "$REMOTE_HEAD" 2>>"$LOG_FILE"; then
     # Local has unpushed commits or has diverged. Restore the stash and bail.
-    [ "$STASH_CREATED" = "1" ] && git stash pop --quiet >>"$LOG_FILE" 2>&1
+    if [ "$STASH_CREATED" = "1" ]; then
+        if ! git stash pop --quiet >>"$LOG_FILE" 2>&1; then
+            git reset --hard --quiet >>"$LOG_FILE" 2>&1
+            git clean -fd --quiet >>"$LOG_FILE" 2>&1
+            die "cannot fast-forward and local edits remain in the stash; resolve manually: git -C \"$DOTFILES_DIR\" stash pop (see $LOG_FILE)"
+        fi
+    fi
     die "cannot fast-forward — local diverged or has unpushed commits (see $LOG_FILE)"
 fi
 
@@ -112,10 +217,13 @@ if [ "$STASH_CREATED" = "1" ] && ! git stash pop --quiet 2>>"$LOG_FILE"; then
     # restored — safe because the stash with -u captured them all.
     git reset --hard --quiet "$LOCAL_HEAD" >>"$LOG_FILE" 2>&1
     git clean -fd --quiet >>"$LOG_FILE" 2>&1
-    git stash pop --quiet >>"$LOG_FILE" 2>&1
-    die "upstream conflicts with local edits; rolled back to $(git rev-parse --short "$LOCAL_HEAD") (see $LOG_FILE)"
+    if git stash pop --quiet >>"$LOG_FILE" 2>&1; then
+        die "upstream conflicts with local edits; rolled back to $(git rev-parse --short "$LOCAL_HEAD") (see $LOG_FILE)"
+    fi
+    die "upstream conflicts with local edits; rolled back to $(git rev-parse --short "$LOCAL_HEAD") but local edits remain in the stash — resolve manually: git -C \"$DOTFILES_DIR\" stash pop (see $LOG_FILE)"
 fi
 
 ./install.sh >>"$LOG_FILE" 2>&1 || die "install.sh failed (see $LOG_FILE)"
 
 notice "updated $(git rev-parse --short "$LOCAL_HEAD") -> $(git rev-parse --short HEAD)"
+report_health

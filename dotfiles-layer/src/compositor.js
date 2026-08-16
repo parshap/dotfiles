@@ -3,7 +3,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { LOCK_DIR, REGISTRY, STATE_FILE, STATE_ROOT } from "./config.js";
 import { composeRegistry, loadLayers, validateManifest } from "./manifest.js";
-import { applyJsonPatch, mergePatch, preservePointer } from "./rfc.js";
+import { applyJsonPatch, maskPointers, mergePatch, preservePointer } from "./rfc.js";
 import { clone, compareText, exists, fail, hash, isObject, jsonText, readJson, safeName } from "./util.js";
 
 function readLiveJson(targetPath) {
@@ -57,7 +57,10 @@ function targetPlan(target) {
   }
   for (const pointer of target.preserve || []) value = preservePointer(value, live, pointer);
   const content = Buffer.from(jsonText(value));
-  return { kind: "file", target, content, digest: hash(content) };
+  const controlledDigest = (target.preserve || []).length > 0
+    ? hash(jsonText(maskPointers(value, target.preserve)))
+    : undefined;
+  return { kind: "file", target, content, digest: hash(content), controlledDigest };
 }
 
 function makePlans(targetId) {
@@ -65,7 +68,7 @@ function makePlans(targetId) {
   const targets = composeRegistry(layers);
   if (targetId && !targets.has(targetId)) fail(`unknown target: ${targetId}`);
   const selected = targetId ? [targets.get(targetId)] : [...targets.values()].sort((a, b) => compareText(a.id, b.id));
-  return { layers, plans: selected.map(targetPlan) };
+  return { layers, targets, plans: selected.map(targetPlan) };
 }
 
 function readState() {
@@ -73,6 +76,26 @@ function readState() {
   const state = readJson(STATE_FILE, "managed state");
   if (!isObject(state) || state.version !== 1 || !isObject(state.targets)) fail("malformed managed state");
   return state;
+}
+
+function nativeDigestAt(targetPath, app) {
+  if (!exists(targetPath) || !fs.lstatSync(targetPath).isDirectory()) return exists(targetPath) ? "wrong-kind" : null;
+  const fragments = path.join(targetPath, "fragments");
+  if (!exists(fragments) || !fs.lstatSync(fragments).isDirectory()) return "wrong-kind";
+  const entries = [];
+  for (const name of fs.readdirSync(fragments).sort()) {
+    const file = path.join(fragments, name);
+    if (!fs.lstatSync(file).isSymbolicLink()) return "wrong-kind";
+    entries.push({ name, source: path.resolve(path.dirname(file), fs.readlinkSync(file)) });
+  }
+  let loader = "";
+  const loaderName = app === "git" ? "loader.gitconfig" : app === "tmux" ? "loader.conf" : null;
+  if (loaderName) {
+    const loaderPath = path.join(targetPath, loaderName);
+    if (!exists(loaderPath) || !fs.lstatSync(loaderPath).isFile()) return "wrong-kind";
+    loader = fs.readFileSync(loaderPath, "utf8");
+  }
+  return hash(JSON.stringify(entries) + loader);
 }
 
 function actualDigest(plan) {
@@ -86,35 +109,94 @@ function actualDigest(plan) {
     if (!fs.lstatSync(p).isFile()) return "wrong-kind";
     return hash(fs.readFileSync(p));
   }
-  if (!fs.lstatSync(p).isDirectory()) return "wrong-kind";
-  const fragments = path.join(p, "fragments");
-  if (!exists(fragments) || !fs.lstatSync(fragments).isDirectory()) return "wrong-kind";
-  const entries = [];
-  for (const name of fs.readdirSync(fragments).sort()) {
-    const file = path.join(fragments, name);
-    if (!fs.lstatSync(file).isSymbolicLink()) return "wrong-kind";
-    entries.push({ name, source: path.resolve(path.dirname(file), fs.readlinkSync(file)) });
+  return nativeDigestAt(p, plan.target.app);
+}
+
+function actualDigestForRecord(record) {
+  if (!exists(record.path)) return null;
+  if (record.strategy === "symlink") {
+    if (!fs.lstatSync(record.path).isSymbolicLink()) return "wrong-kind";
+    return hash(`link:${path.resolve(path.dirname(record.path), fs.readlinkSync(record.path))}`);
   }
-  let loader = "";
-  const loaderName = plan.target.app === "git" ? "loader.gitconfig" : plan.target.app === "tmux" ? "loader.conf" : null;
-  if (loaderName) {
-    const loaderPath = path.join(p, loaderName);
-    if (!exists(loaderPath)) return "wrong-kind";
-    loader = fs.readFileSync(loaderPath, "utf8");
+  if (record.strategy === "native-include") {
+    if (!record.app) return "unknown-metadata";
+    return nativeDigestAt(record.path, record.app);
   }
-  return hash(JSON.stringify(entries) + loader);
+  if (!fs.lstatSync(record.path).isFile()) return "wrong-kind";
+  return hash(fs.readFileSync(record.path));
+}
+
+function removeRecordedTarget(record) {
+  if (!exists(record.path)) return;
+  if (record.strategy === "native-include") {
+    if (!fs.lstatSync(record.path).isDirectory()) fail(`refusing to recursively remove non-directory stale target ${record.path}`);
+    fs.rmSync(record.path, { recursive: true });
+    return;
+  }
+  if (fs.lstatSync(record.path).isDirectory()) fail(`refusing to remove directory at stale target ${record.path}`);
+  fs.rmSync(record.path);
 }
 
 function statusFor(plan, state) {
   const actual = actualDigest(plan);
-  const record = state.targets[plan.target.id];
+  const record = state.targets[plan.target.id]
+    ?? Object.values(state.targets).find((candidate) => candidate?.path === plan.target.path);
+  let actualControlledDigest;
+  if (plan.controlledDigest && actual !== null && actual !== "wrong-kind") {
+    try {
+      const actualValue = readJson(plan.target.path, `live target ${plan.target.path}`);
+      actualControlledDigest = hash(jsonText(maskPointers(actualValue, plan.target.preserve || [])));
+    } catch {
+      actualControlledDigest = "invalid";
+    }
+  }
   const modeCurrent = plan.kind !== "file" || actual === null || actual === "wrong-kind" || (fs.lstatSync(plan.target.path).mode & 0o777) === modeFor(plan);
-  return { actual, record, current: actual === plan.digest && modeCurrent, managed: Boolean(record && record.path === plan.target.path) };
+  return {
+    actual,
+    actualControlledDigest,
+    record,
+    current: actual === plan.digest && modeCurrent,
+    managed: Boolean(record && record.path === plan.target.path),
+  };
 }
 
 function modeFor(plan) {
   if (plan.target.mode) return Number.parseInt(plan.target.mode, 8);
   return ["json-patch", "json-merge-patch"].includes(plan.target.strategy) ? 0o600 : 0o644;
+}
+
+let backupDir = null;
+
+function backupPathFor(targetPath) {
+  if (!backupDir) {
+    const stamp = new Date().toISOString().replace(/[:.]/g, "-");
+    backupDir = path.join(STATE_ROOT, "backups", `${stamp}-${process.pid}`);
+  }
+  return path.join(backupDir, targetPath.replaceAll("/", "__"));
+}
+
+// Preserve content the ledger cannot reproduce (unmanaged or drifted) before a
+// force path displaces it. The printed path is the recovery mechanism.
+function backupExisting(targetPath) {
+  const backup = backupPathFor(targetPath);
+  fs.mkdirSync(path.dirname(backup), { recursive: true, mode: 0o700 });
+  const stat = fs.lstatSync(targetPath);
+  if (stat.isSymbolicLink()) fs.symlinkSync(fs.readlinkSync(targetPath), backup);
+  else if (stat.isDirectory()) fs.cpSync(targetPath, backup, { recursive: true, verbatimSymlinks: true });
+  else fs.copyFileSync(targetPath, backup);
+  console.log(`Backed up ${targetPath} -> ${backup}`);
+}
+
+function pruneBackups() {
+  const root = path.join(STATE_ROOT, "backups");
+  if (!exists(root)) return;
+  const cutoff = Date.now() - 30 * 24 * 60 * 60 * 1000;
+  for (const name of fs.readdirSync(root)) {
+    try {
+      const entry = path.join(root, name);
+      if (fs.statSync(entry).mtimeMs < cutoff) fs.rmSync(entry, { recursive: true, force: true });
+    } catch { /* retention is best effort */ }
+  }
 }
 
 function atomicFile(file, content, mode) {
@@ -139,41 +221,91 @@ function publishNative(plan) {
   fs.mkdirSync(parent, { recursive: true, mode: 0o700 });
   const stage = path.join(parent, `.${path.basename(plan.target.path)}.stage-${process.pid}-${crypto.randomBytes(5).toString("hex")}`);
   const backup = `${stage}.old`;
+  let movedExisting = false;
   try {
     const fragments = path.join(stage, "fragments");
     fs.mkdirSync(fragments, { recursive: true, mode: 0o700 });
     for (const entry of plan.entries) fs.symlinkSync(entry.source, path.join(fragments, entry.name));
     if (plan.target.app === "git") fs.writeFileSync(path.join(stage, "loader.gitconfig"), plan.loader, { mode: 0o600 });
     if (plan.target.app === "tmux") fs.writeFileSync(path.join(stage, "loader.conf"), plan.loader, { mode: 0o600 });
-    if (exists(plan.target.path)) fs.renameSync(plan.target.path, backup);
-    fs.renameSync(stage, plan.target.path);
-    if (exists(backup)) fs.rmSync(backup, { recursive: true, force: true });
-  } catch (error) {
-    if (!exists(plan.target.path) && exists(backup)) fs.renameSync(backup, plan.target.path);
-    throw error;
+    if (exists(plan.target.path)) {
+      fs.renameSync(plan.target.path, backup);
+      movedExisting = true;
+    }
+    try {
+      fs.renameSync(stage, plan.target.path);
+    } catch (publishError) {
+      if (movedExisting && !exists(plan.target.path)) {
+        try { fs.renameSync(backup, plan.target.path); }
+        catch (restoreError) {
+          fail(`failed to publish ${plan.target.id} and restore its previous output; backup preserved at ${backup}: ${restoreError.message}`);
+        }
+      }
+      if (exists(backup)) fail(`failed to publish ${plan.target.id}; previous output preserved at ${backup}: ${publishError.message}`);
+      throw publishError;
+    }
+    if (movedExisting) fs.rmSync(backup, { recursive: true, force: true });
   } finally {
     if (exists(stage)) fs.rmSync(stage, { recursive: true, force: true });
-    if (exists(backup)) fs.rmSync(backup, { recursive: true, force: true });
   }
 }
 
 function acquireLock() {
   fs.mkdirSync(STATE_ROOT, { recursive: true, mode: 0o700 });
-  try { fs.mkdirSync(LOCK_DIR, { mode: 0o700 }); }
-  catch (error) {
-    if (error.code !== "EEXIST") throw error;
-    let stale = false;
+  const token = crypto.randomBytes(16).toString("hex");
+  const ownerPath = path.join(LOCK_DIR, "owner.json");
+
+  for (let attempt = 0; attempt < 2; attempt++) {
     try {
-      const pid = Number(fs.readFileSync(path.join(LOCK_DIR, "pid"), "utf8"));
-      if (!Number.isSafeInteger(pid) || pid <= 0) stale = true;
-      else { try { process.kill(pid, 0); } catch (killError) { if (killError.code === "ESRCH") stale = true; } }
-    } catch { stale = true; }
-    if (!stale) fail("another dotfiles-layer process holds the global lock");
-    fs.rmSync(LOCK_DIR, { recursive: true, force: true });
-    fs.mkdirSync(LOCK_DIR, { mode: 0o700 });
+      fs.mkdirSync(LOCK_DIR, { mode: 0o700 });
+      try {
+        fs.writeFileSync(ownerPath, jsonText({ pid: process.pid, token, createdAt: Date.now() }), { mode: 0o600 });
+      } catch (error) {
+        fs.rmSync(LOCK_DIR, { recursive: true, force: true });
+        throw error;
+      }
+      return () => {
+        try {
+          const owner = readJson(ownerPath, "lock owner");
+          if (owner?.token === token) fs.rmSync(LOCK_DIR, { recursive: true, force: true });
+        } catch {
+          // Never remove a lock whose ownership can no longer be verified.
+        }
+      };
+    } catch (error) {
+      if (error.code !== "EEXIST") throw error;
+    }
+
+    let owner;
+    try { owner = readJson(ownerPath, "lock owner"); } catch { owner = undefined; }
+    if (Number.isSafeInteger(owner?.pid) && owner.pid > 0) {
+      try {
+        process.kill(owner.pid, 0);
+        fail("another dotfiles-layer process holds the global lock");
+      } catch (error) {
+        if (error instanceof Error && error.message === "another dotfiles-layer process holds the global lock") throw error;
+        if (error.code !== "ESRCH") fail("another dotfiles-layer process holds the global lock");
+      }
+    } else {
+      let ageMs;
+      try { ageMs = Date.now() - fs.statSync(LOCK_DIR).mtimeMs; }
+      catch (error) {
+        if (error.code === "ENOENT") continue;
+        throw error;
+      }
+      if (ageMs < 30_000) fail("another dotfiles-layer process is initializing the global lock");
+    }
+
+    const stalePath = `${LOCK_DIR}.stale-${process.pid}-${crypto.randomBytes(5).toString("hex")}`;
+    try { fs.renameSync(LOCK_DIR, stalePath); }
+    catch (error) {
+      if (error.code === "ENOENT" || error.code === "EEXIST") fail("another dotfiles-layer process is reclaiming the global lock");
+      throw error;
+    }
+    fs.rmSync(stalePath, { recursive: true, force: true });
   }
-  fs.writeFileSync(path.join(LOCK_DIR, "pid"), `${process.pid}\n`, { mode: 0o600 });
-  return () => fs.rmSync(LOCK_DIR, { recursive: true, force: true });
+
+  fail("could not acquire the global dotfiles-layer lock");
 }
 
 function withLock(callback) {
@@ -184,40 +316,87 @@ function withLock(callback) {
 export function apply(targetId, options) {
   return withLock(() => {
     // Build every selected result before publishing any of them.
-    const { plans } = makePlans(targetId);
+    const { targets, plans } = makePlans(targetId);
     const state = readState();
     const originalState = jsonText(state);
+    const desiredPaths = new Set([...targets.values()].map((target) => target.path));
+    const stale = targetId
+      ? []
+      : Object.entries(state.targets).filter(([id]) => !targets.has(id));
+
     for (const plan of plans) {
       const status = statusFor(plan, state);
       if (status.current) {
-        if (!status.managed && !options.adopt && !options.force) fail(`${plan.target.id}: desired target already exists but is unmanaged; use --adopt`);
+        if (!status.managed && !options.adopt && !options.force) fail(`${plan.target.id}: desired target already exists but is unmanaged; record ownership with: dotfiles-layer apply ${plan.target.id} --adopt`);
         continue;
       }
-      if (status.actual !== null && !status.managed && !options.force) fail(`${plan.target.id}: refusing to replace unmanaged target ${plan.target.path}; use --force`);
-      const acceptsLiveInput = ["json-patch", "json-merge-patch"].includes(plan.target.strategy)
-        && (plan.target.base === "live" || (plan.target.preserve || []).length > 0);
-      if (status.managed && status.record.digest !== status.actual && !options.force && !acceptsLiveInput) {
-        fail(`${plan.target.id}: managed target was modified outside the compositor; use --force`);
+      if (status.actual !== null && !status.managed && !options.force) fail(`${plan.target.id}: refusing to replace unmanaged target ${plan.target.path}; inspect with: dotfiles-layer diff ${plan.target.id}; then replace with: dotfiles-layer apply ${plan.target.id} --force (the existing content is backed up first)`);
+      const acceptsLiveBase = ["json-patch", "json-merge-patch"].includes(plan.target.strategy)
+        && plan.target.base === "live";
+      const onlyPreservedFieldsChanged = Boolean(
+        plan.controlledDigest
+        && status.record?.controlledDigest
+        && status.actualControlledDigest === status.record.controlledDigest
+      );
+      if (status.managed && status.record.digest !== status.actual && !options.force && !acceptsLiveBase && !onlyPreservedFieldsChanged) {
+        fail(`${plan.target.id}: managed target was modified outside the compositor; inspect with: dotfiles-layer diff ${plan.target.id}; to keep the change, adopt it into the layer source (see: dotfiles-layer explain ${plan.target.id}); to discard it: dotfiles-layer apply ${plan.target.id} --force (the modified content is backed up first)`);
       }
     }
-    let changed = 0;
-    let persistedState = originalState;
-    for (const plan of plans) {
-      const status = statusFor(plan, state);
-      if (!status.current) {
-        if (plan.kind === "file") atomicFile(plan.target.path, plan.content, modeFor(plan));
-        else if (plan.kind === "symlink") atomicSymlink(plan.target.path, plan.source);
-        else publishNative(plan);
-        changed++;
+
+    const stalePlans = stale.map(([id, record]) => {
+      const superseded = desiredPaths.has(record.path);
+      const actual = superseded ? record.digest : actualDigestForRecord(record);
+      if (!superseded && actual !== null && actual !== record.digest && !options.force) {
+        fail(`${id}: stale managed target ${record.path} was modified outside the compositor; inspect the file, then prune with: dotfiles-layer apply --force (the modified content is backed up first)`);
       }
-      state.targets[plan.target.id] = { path: plan.target.path, strategy: plan.target.strategy, digest: plan.digest };
+      return { id, record, actual, superseded };
+    });
+
+    let changed = 0;
+    let pruned = 0;
+    let persistedState = originalState;
+    const persistState = () => {
       const nextState = jsonText(state);
       if (nextState !== persistedState) {
         atomicFile(STATE_FILE, Buffer.from(nextState), 0o600);
         persistedState = nextState;
       }
+    };
+
+    for (const plan of plans) {
+      const status = statusFor(plan, state);
+      if (!status.current) {
+        // Managed content matching its recorded digest is reproducible from
+        // the layers; anything else being displaced is preserved first.
+        const reproducible = status.managed && status.record.digest === status.actual;
+        if (status.actual !== null && !reproducible) backupExisting(plan.target.path);
+        if (plan.kind === "file") atomicFile(plan.target.path, plan.content, modeFor(plan));
+        else if (plan.kind === "symlink") atomicSymlink(plan.target.path, plan.source);
+        else publishNative(plan);
+        changed++;
+      }
+      state.targets[plan.target.id] = {
+        path: plan.target.path,
+        strategy: plan.target.strategy,
+        digest: plan.digest,
+        ...(plan.target.app ? { app: plan.target.app } : {}),
+        ...(plan.controlledDigest ? { controlledDigest: plan.controlledDigest } : {}),
+      };
+      persistState();
     }
-    console.log(`Applied ${plans.length} target(s); ${changed} changed.`);
+
+    for (const stalePlan of stalePlans) {
+      if (!stalePlan.superseded && stalePlan.actual !== null) {
+        if (stalePlan.actual !== stalePlan.record.digest) backupExisting(stalePlan.record.path);
+        removeRecordedTarget(stalePlan.record);
+      }
+      delete state.targets[stalePlan.id];
+      persistState();
+      pruned++;
+    }
+
+    pruneBackups();
+    console.log(`Applied ${plans.length} target(s); ${changed} changed; ${pruned} pruned.`);
   });
 }
 
@@ -307,7 +486,7 @@ function printablePlan(plan, desired) {
 }
 
 export function check(targetId, showDiff = false) {
-  const { plans } = makePlans(targetId);
+  const { targets, plans } = makePlans(targetId);
   const state = readState();
   let different = 0;
   for (const plan of plans) {
@@ -322,6 +501,14 @@ export function check(targetId, showDiff = false) {
         console.log(lines.join("\n"));
         if (lines.length === 1 && lines[0].includes("too large")) console.log(`@@ sha256 ${String(status.actual).slice(0, 12)} -> ${plan.digest.slice(0, 12)} @@`);
       }
+    }
+  }
+  if (!targetId) {
+    for (const [id, record] of Object.entries(state.targets)) {
+      if (targets.has(id)) continue;
+      const superseded = [...targets.values()].some((target) => target.path === record.path);
+      console.log(`${id}: stale (managed)${superseded ? "; path superseded by another target" : ` -> ${record.path}`}`);
+      different++;
     }
   }
   if (different) process.exitCode = 1;

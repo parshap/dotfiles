@@ -1,18 +1,6 @@
 import fastJsonPatch from "fast-json-patch";
 import jsonMergePatch from "json-merge-patch";
-import { clone, fail, hasOwn, isObject, setOwn, UserError } from "./util.js";
-
-function deepEqual(a, b) {
-  if (a === b) return true;
-  if (Array.isArray(a) || Array.isArray(b)) return Array.isArray(a) && Array.isArray(b) && a.length === b.length && a.every((value, i) => deepEqual(value, b[i]));
-  if (isObject(a) || isObject(b)) {
-    if (!isObject(a) || !isObject(b)) return false;
-    const aKeys = Object.keys(a).sort();
-    const bKeys = Object.keys(b).sort();
-    return aKeys.length === bKeys.length && aKeys.every((key, i) => key === bKeys[i] && deepEqual(a[key], b[key]));
-  }
-  return false;
-}
+import { clone, fail, hasOwn, isObject, setOwn } from "./util.js";
 
 export function parsePointer(pointer) {
   if (typeof pointer !== "string") fail("JSON pointer must be a string");
@@ -53,87 +41,43 @@ function hasPointer(document, pointer) {
   try { getPointer(document, pointer); return true; } catch { return false; }
 }
 
-function addPointer(document, tokens, value) {
-  if (!tokens.length) return clone(value);
-  const parent = locate(document, tokens, { parent: true });
-  const token = tokens.at(-1);
-  if (Array.isArray(parent)) parent.splice(arrayIndex(token, parent.length, true, true), 0, clone(value));
-  else if (isObject(parent)) setOwn(parent, token, clone(value));
-  else fail("JSON Patch add parent is not a container");
-  return document;
-}
-
-function removePointer(document, tokens) {
-  if (!tokens.length) return undefined;
-  const parent = locate(document, tokens, { parent: true });
-  const token = tokens.at(-1);
-  if (Array.isArray(parent)) parent.splice(arrayIndex(token, parent.length), 1);
-  else if (isObject(parent) && Object.prototype.hasOwnProperty.call(parent, token)) delete parent[token];
-  else fail(`JSON Patch remove path does not exist: /${tokens.join("/")}`);
-  return document;
-}
-
-function replacePointer(document, tokens, value) {
-  if (!tokens.length) return clone(value);
-  getPointer(document, tokens);
-  const parent = locate(document, tokens, { parent: true });
-  const token = tokens.at(-1);
-  if (Array.isArray(parent)) parent[arrayIndex(token, parent.length)] = clone(value);
-  else setOwn(parent, token, clone(value));
-  return document;
-}
-
-function applyJsonPatchFallback(document, operations) {
-  if (!Array.isArray(operations)) fail("JSON Patch contribution must be an array");
-  let result = clone(document);
-  for (let i = 0; i < operations.length; i++) {
-    const op = operations[i];
-    if (!isObject(op) || typeof op.op !== "string" || typeof op.path !== "string") fail(`invalid JSON Patch operation ${i}`);
-    const tokens = parsePointer(op.path);
-    try {
-      switch (op.op) {
-        case "add":
-          if (!("value" in op)) fail("add requires value");
-          result = addPointer(result, tokens, op.value); break;
-        case "remove": result = removePointer(result, tokens); break;
-        case "replace":
-          if (!("value" in op)) fail("replace requires value");
-          result = replacePointer(result, tokens, op.value); break;
-        case "move": {
-          if (typeof op.from !== "string") fail("move requires from");
-          const from = parsePointer(op.from);
-          if (tokens.length > from.length && from.every((x, j) => x === tokens[j])) fail("cannot move a value into one of its children");
-          const value = clone(getPointer(result, from));
-          result = removePointer(result, from);
-          result = addPointer(result, tokens, value);
-          break;
-        }
-        case "copy": {
-          if (typeof op.from !== "string") fail("copy requires from");
-          result = addPointer(result, tokens, getPointer(result, parsePointer(op.from)));
-          break;
-        }
-        case "test":
-          if (!("value" in op) || !deepEqual(getPointer(result, tokens), op.value)) fail(`JSON Patch test failed at ${op.path}`);
-          break;
-        default: fail(`unsupported JSON Patch operation: ${op.op}`);
-      }
-    } catch (error) {
-      if (error instanceof UserError && !error.message.startsWith("JSON Patch operation")) error.message = `JSON Patch operation ${i}: ${error.message}`;
-      throw error;
-    }
+function removeMaskedPointer(document, tokens) {
+  if (!tokens.length) return null;
+  const stack = [];
+  let cursor = document;
+  for (let index = 0; index < tokens.length - 1; index++) {
+    const token = tokens[index];
+    if (Array.isArray(cursor)) {
+      const position = arrayIndex(token, cursor.length);
+      stack.push({ parent: cursor, key: position, array: true });
+      cursor = cursor[position];
+    } else if (isObject(cursor) && hasOwn(cursor, token)) {
+      stack.push({ parent: cursor, key: token, array: false });
+      cursor = cursor[token];
+    } else return document;
   }
-  if (result === undefined) fail("JSON Patch removed the root without replacing it");
-  return result;
+
+  const last = tokens.at(-1);
+  if (Array.isArray(cursor)) cursor[arrayIndex(last, cursor.length)] = null;
+  else if (isObject(cursor) && hasOwn(cursor, last)) delete cursor[last];
+  else return document;
+
+  // If a preserved value was the only reason an object path existed, remove
+  // the now-empty ancestors so "absent" and "present only at this pointer"
+  // normalize to the same controlled digest.
+  for (let index = stack.length - 1; index >= 0; index--) {
+    const { parent, key, array } = stack[index];
+    const child = parent[key];
+    if (!isObject(child) || Object.keys(child).length > 0) break;
+    if (array) parent[key] = null;
+    else delete parent[key];
+  }
+  return document;
 }
 
-function mergePatchFallback(target, patch) {
-  if (!isObject(patch)) return clone(patch);
-  let result = isObject(target) ? clone(target) : {};
-  for (const [key, value] of Object.entries(patch)) {
-    if (value === null) delete result[key];
-    else setOwn(result, key, mergePatchFallback(hasOwn(result, key) ? result[key] : undefined, value));
-  }
+export function maskPointers(value, pointers) {
+  let result = clone(value);
+  for (const pointer of pointers) result = removeMaskedPointer(result, parsePointer(pointer));
   return result;
 }
 
@@ -178,35 +122,38 @@ const hasDangerousMember = (value) => Array.isArray(value)
   ? value.some(hasDangerousMember)
   : isObject(value) && Object.keys(value).some((key) => dangerousKeys.has(key) || hasDangerousMember(value[key]));
 const pointerIsDangerous = (pointer) => parsePointer(pointer).some((token) => dangerousKeys.has(token));
+const assertSafeMembers = (value, description) => {
+  if (hasDangerousMember(value)) fail(`${description} contains a prototype-sensitive member name (__proto__, constructor, or prototype), which is not supported`);
+};
 
 /**
- * Apply RFC 6902. fast-json-patch handles validated ordinary operations,
- * including arrays and root replacement. Prototype-sensitive JSON members use
- * the strict compatibility path so they remain literal own properties.
+ * Apply RFC 6902 via fast-json-patch, which handles validated operations,
+ * including arrays and root replacement. Documents, pointers, and values
+ * containing prototype-sensitive member names are rejected outright rather
+ * than special-cased.
  */
 export function applyJsonPatch(document, operations) {
   if (!Array.isArray(operations)) fail("JSON Patch contribution must be an array");
-  let requiresCompatibility = hasDangerousMember(document);
+  assertSafeMembers(document, "JSON Patch document");
   for (let index = 0; index < operations.length; index++) {
     const operation = operations[index];
     if (!isObject(operation) || typeof operation.op !== "string" || typeof operation.path !== "string") fail(`invalid JSON Patch operation ${index}`);
     if (!["add", "remove", "replace", "move", "copy", "test"].includes(operation.op)) fail(`unsupported JSON Patch operation: ${operation.op}`);
-    parsePointer(operation.path);
+    if (pointerIsDangerous(operation.path)) fail(`JSON Patch operation ${index}: prototype-sensitive member name in path: ${operation.path}`);
     if (["add", "replace", "test"].includes(operation.op) && !hasOwn(operation, "value")) fail(`JSON Patch operation ${index}: ${operation.op} requires value`);
+    if (hasDangerousMember(operation.value)) fail(`JSON Patch operation ${index}: value contains a prototype-sensitive member name (__proto__, constructor, or prototype)`);
     if (["move", "copy"].includes(operation.op)) {
       if (typeof operation.from !== "string") fail(`JSON Patch operation ${index}: ${operation.op} requires from`);
-      const from = parsePointer(operation.from);
+      if (pointerIsDangerous(operation.from)) fail(`JSON Patch operation ${index}: prototype-sensitive member name in from: ${operation.from}`);
       if (operation.op === "move") {
         const destination = parsePointer(operation.path);
+        const from = parsePointer(operation.from);
         if (destination.length > from.length && from.every((token, part) => token === destination[part])) {
           fail(`JSON Patch operation ${index}: cannot move a value into one of its children`);
         }
       }
     }
-    requiresCompatibility ||= pointerIsDangerous(operation.path) || hasDangerousMember(operation.value);
-    if (typeof operation.from === "string") requiresCompatibility ||= pointerIsDangerous(operation.from);
   }
-  if (requiresCompatibility) return applyJsonPatchFallback(document, operations);
 
   try {
     return fastJsonPatch.applyPatch(clone(document), operations, true, false, true).newDocument;
@@ -216,8 +163,9 @@ export function applyJsonPatch(document, operations) {
   }
 }
 
-/** Apply RFC 7396, retaining literal prototype-sensitive JSON member names. */
+/** Apply RFC 7396. Prototype-sensitive member names are rejected outright. */
 export function mergePatch(target, patch) {
-  if (hasDangerousMember(target) || hasDangerousMember(patch)) return mergePatchFallback(target, patch);
+  assertSafeMembers(target, "JSON Merge Patch target");
+  assertSafeMembers(patch, "JSON Merge Patch contribution");
   return jsonMergePatch.apply(clone(target), clone(patch));
 }

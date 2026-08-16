@@ -46,7 +46,13 @@ function expandTarget(raw) {
   if (raw.includes("${XDG_STATE_HOME}")) raw = raw.replaceAll("${XDG_STATE_HOME}", path.dirname(STATE_ROOT));
   if (raw.includes("${XDG_CONFIG_HOME}")) raw = raw.replaceAll("${XDG_CONFIG_HOME}", path.dirname(path.dirname(REGISTRY)));
   if (!path.isAbsolute(raw)) fail(`target path must be absolute or start with ~/: ${raw}`);
-  return path.resolve(raw);
+  const resolved = path.resolve(raw);
+  // The state root holds the ledger, lock, and backups; only native-include
+  // projections (assigned directly, not via this function) may live there.
+  if (resolved === STATE_ROOT || resolved.startsWith(`${STATE_ROOT}${path.sep}`)) {
+    fail(`target path must not be inside the compositor state root: ${raw}`);
+  }
+  return resolved;
 }
 
 function sourcePath(root, raw) {

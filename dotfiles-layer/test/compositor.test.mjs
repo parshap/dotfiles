@@ -6,7 +6,7 @@ import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { spawnSync } from "node:child_process";
-import { applyJsonPatch } from "../src/rfc.js";
+import { applyJsonPatch, mergePatch } from "../src/rfc.js";
 import { compileStatusPromotions, selectPromotedStatus } from "../pi/lib/statusline-promotions.mjs";
 
 const TEST_DIR = path.dirname(fileURLToPath(import.meta.url));
@@ -206,42 +206,27 @@ test("real personal and external overlay manifests preserve live Claude and Pi a
   assert.equal(fs.readdirSync(path.join(f.state, "dotfiles-layer/native/zsh-fragments/fragments")).length, zshContributionCount);
 });
 
-test("treats __proto__ as an ordinary RFC JSON object member", () => {
+test("rejects prototype-sensitive member names in JSON documents and contributions", () => {
+  // Note: object literals cannot hold an own "__proto__" key, hence JSON.parse.
+  assert.throws(() => applyJsonPatch({}, [{ op: "add", path: "/__proto__", value: 1 }]), /prototype-sensitive/);
+  assert.throws(() => applyJsonPatch({}, [{ op: "add", path: "/a", value: JSON.parse('{"constructor":{}}') }]), /prototype-sensitive/);
+  assert.throws(() => applyJsonPatch(JSON.parse('{"__proto__":{"x":1}}'), [{ op: "add", path: "/a", value: 1 }]), /prototype-sensitive/);
+  assert.throws(() => applyJsonPatch({}, [{ op: "copy", from: "/prototype", path: "/a" }]), /prototype-sensitive/);
+  assert.throws(() => mergePatch({}, JSON.parse('{"__proto__":{"x":1}}')), /prototype-sensitive/);
+  assert.throws(() => mergePatch(JSON.parse('{"__proto__":{"x":1}}'), {}), /prototype-sensitive/);
+  // Ordinary lookalike keys are unaffected.
+  assert.deepEqual(applyJsonPatch({}, [{ op: "add", path: "/proto", value: 1 }]), { proto: 1 });
+  assert.deepEqual(mergePatch({}, { proto: 1 }), { proto: 1 });
+
+  // End to end: a contribution with such a member fails the apply loudly.
   const f = fixture();
-  const mergePath = path.join(f.home, "merge.json");
-  const patchPath = path.join(f.home, "patch.json");
-  const copyPath = path.join(f.home, "copy.json");
   const layer = f.layer("proto", {
     priority: 1,
-    targets: {
-      merge: { strategy: "json-merge-patch", path: mergePath },
-      patch: { strategy: "json-patch", path: patchPath },
-      copy: { strategy: "json-patch", path: copyPath, base: "live" }
-    },
-    contributions: [
-      { target: "merge", path: "merge.json" },
-      { target: "patch", path: "patch.json" },
-      { target: "copy", path: "copy.json" }
-    ]
-  }, {
-    "merge.json": '{"__proto__":{"source":"merge"}}',
-    "patch.json": '[{"op":"add","path":"/__proto__","value":{"source":"patch"}},{"op":"add","path":"/nested","value":{"__proto__":{"deep":true}}}]',
-    "copy.json": '[{"op":"copy","from":"/source","path":"/copied"}]'
-  });
-  f.write(copyPath, '{"source":{"__proto__":{"copied":true}}}');
+    targets: { merge: { strategy: "json-merge-patch", path: path.join(f.home, "merge.json") } },
+    contributions: [{ target: "merge", path: "merge.json" }]
+  }, { "merge.json": '{"__proto__":{"source":"merge"}}' });
   ok(f.run("register", "proto", layer));
-  ok(f.run("apply", "--force"));
-  const merged = JSON.parse(fs.readFileSync(mergePath, "utf8"));
-  const patched = JSON.parse(fs.readFileSync(patchPath, "utf8"));
-  assert.equal(Object.prototype.hasOwnProperty.call(merged, "__proto__"), true);
-  assert.equal(Object.prototype.hasOwnProperty.call(patched, "__proto__"), true);
-  assert.deepEqual(merged.__proto__, { source: "merge" });
-  assert.deepEqual(patched.__proto__, { source: "patch" });
-  assert.equal(Object.prototype.hasOwnProperty.call(patched.nested, "__proto__"), true);
-  assert.deepEqual(patched.nested.__proto__, { deep: true });
-  const copied = JSON.parse(fs.readFileSync(copyPath, "utf8"));
-  assert.equal(Object.prototype.hasOwnProperty.call(copied.copied, "__proto__"), true);
-  assert.deepEqual(copied.copied.__proto__, { copied: true });
+  notOk(f.run("apply", "--force"), /prototype-sensitive/);
 });
 
 test("accepts declared live-base and preserved-field changes during a later source update", () => {
@@ -253,12 +238,20 @@ test("accepts declared live-base and preserved-field changes during a later sour
     contributions: [{ target: "settings", path: "settings.patch.json" }]
   }, { "settings.patch.json": '[{"op":"add","path":"/managed","value":1}]' });
   ok(f.run("register", "stateful", layer));
-  f.write(target, '{"runtime":"first"}');
-  ok(f.run("apply", "--force"));
+  ok(f.run("apply"));
+  assert.deepEqual(JSON.parse(fs.readFileSync(target, "utf8")), { managed: 1 });
+
+  // A preserved application-owned field may appear after the first apply.
   f.write(target, '{"managed":1,"runtime":"second"}');
   f.write(path.join(layer, "settings.patch.json"), '[{"op":"add","path":"/managed","value":2}]');
   ok(f.run("apply"));
   assert.deepEqual(JSON.parse(fs.readFileSync(target, "utf8")), { managed: 2, runtime: "second" });
+
+  f.write(target, '{"managed":999,"runtime":"third"}');
+  f.write(path.join(layer, "settings.patch.json"), '[{"op":"add","path":"/managed","value":3}]');
+  notOk(f.run("apply"), /modified outside/);
+  ok(f.run("apply", "--force"));
+  assert.deepEqual(JSON.parse(fs.readFileSync(target, "utf8")), { managed: 3, runtime: "third" });
 });
 
 test("ignores relative XDG roots instead of scattering state under the working directory", () => {
@@ -297,6 +290,58 @@ test("protects unmanaged files and supports matching adoption and explicit force
   notOk(f.run("apply"), /modified outside/);
   ok(f.run("apply", "--force"));
   assert.equal(fs.lstatSync(desired).isFile(), true);
+});
+
+test("rejects target paths inside the compositor state root", () => {
+  const f = fixture();
+  const layer = f.layer("bad", {
+    priority: 1,
+    targets: { evil: { strategy: "copy", path: path.join(f.state, "dotfiles-layer", "managed.json") } },
+    contributions: [{ target: "evil", path: "src" }]
+  }, { src: "x\n" });
+  notOk(f.run("register", "bad", layer), /state root/);
+});
+
+test("force paths back up displaced content and clean applies do not", () => {
+  const f = fixture();
+  const target = path.join(f.home, "out/settings.json");
+  const backupsRoot = path.join(f.state, "dotfiles-layer/backups");
+  const backupDirs = () => fs.existsSync(backupsRoot) ? fs.readdirSync(backupsRoot).sort() : [];
+  const backupContent = (dir) => JSON.parse(fs.readFileSync(path.join(backupsRoot, dir, target.replaceAll("/", "__")), "utf8"));
+  const layer = f.layer("layer", {
+    priority: 1,
+    targets: { settings: { strategy: "json-merge-patch", path: target, base: "empty" } },
+    contributions: [{ target: "settings", path: "base.json" }]
+  }, { "base.json": JSON.stringify({ a: 1 }) });
+  ok(f.run("register", "layer", layer));
+
+  // Replacing an unmanaged target under --force preserves its content.
+  f.write(target, JSON.stringify({ local: true }));
+  notOk(f.run("apply"), /refusing to replace unmanaged/);
+  ok(f.run("apply", "--force"));
+  assert.deepEqual(backupDirs().length, 1);
+  assert.deepEqual(backupContent(backupDirs()[0]), { local: true });
+
+  // Drifted managed content is preserved when --force reverts it.
+  f.write(target, JSON.stringify({ a: 1, drifted: true }));
+  ok(f.run("apply", "--force"));
+  assert.deepEqual(backupDirs().length, 2);
+  assert.deepEqual(backupContent(backupDirs()[1]), { a: 1, drifted: true });
+
+  // A no-op apply and a clean source update displace nothing irreproducible.
+  ok(f.run("apply"));
+  f.write(path.join(layer, "base.json"), JSON.stringify({ a: 2 }));
+  ok(f.run("apply"));
+  assert.deepEqual(backupDirs().length, 2);
+  assert.deepEqual(JSON.parse(fs.readFileSync(target, "utf8")), { a: 2 });
+
+  // A drifted stale target is preserved before pruning under --force.
+  f.write(target, JSON.stringify({ a: 2, staleDrift: true }));
+  ok(f.run("unregister", "layer"));
+  ok(f.run("apply", "--force"));
+  assert.equal(fs.existsSync(target), false);
+  assert.deepEqual(backupDirs().length, 3);
+  assert.deepEqual(backupContent(backupDirs()[2]), { a: 2, staleDrift: true });
 });
 
 test("rejects malformed registries, traversal, unknown targets, duplicate definitions/names, unsupported strategies, and ambiguous winners", () => {
@@ -428,4 +473,85 @@ test("deleting managed.json forgets ownership and requires explicit re-adoption"
   notOk(f.run("apply"), /unmanaged.*--adopt/);
   ok(f.run("apply", "--adopt"));
   assert.equal(fs.existsSync(ledger), true);
+});
+
+test("does not reclaim an initializing lock and safely reclaims a dead owner", () => {
+  const f = fixture();
+  const target = path.join(f.home, "locked");
+  const layer = f.layer("locker", {
+    priority: 1,
+    targets: { locked: { strategy: "copy", path: target } },
+    contributions: [{ target: "locked", path: "source" }]
+  }, { source: "locked\n" });
+  ok(f.run("register", "locker", layer));
+
+  const lock = path.join(f.state, "dotfiles-layer/lock");
+  fs.mkdirSync(lock, { recursive: true });
+  notOk(f.run("apply"), /initializing the global lock/);
+  assert.equal(fs.existsSync(lock), true);
+
+  fs.writeFileSync(path.join(lock, "owner.json"), JSON.stringify({ pid: 2_147_483_647, token: "dead" }));
+  ok(f.run("apply"));
+  assert.equal(fs.existsSync(lock), false);
+});
+
+test("full apply prunes clean stale targets and reports them in check", () => {
+  const f = fixture();
+  const target = path.join(f.home, "stale");
+  const layer = f.layer("pruner", {
+    priority: 1,
+    targets: { old: { strategy: "copy", path: target } },
+    contributions: [{ target: "old", path: "source" }]
+  }, { source: "managed\n" });
+  ok(f.run("register", "pruner", layer));
+  ok(f.run("apply"));
+  assert.equal(fs.existsSync(target), true);
+
+  f.write(path.join(layer, "layer.json"), JSON.stringify({ version: 1, name: "pruner", priority: 1 }));
+  const check = notOk(f.run("check"));
+  assert.match(check.stdout, /old: stale \(managed\)/);
+  assert.match(ok(f.run("apply")).stdout, /1 pruned/);
+  assert.equal(fs.existsSync(target), false);
+  const state = JSON.parse(fs.readFileSync(path.join(f.state, "dotfiles-layer/managed.json"), "utf8"));
+  assert.equal(state.targets.old, undefined);
+});
+
+test("stale drift requires force and target-id renames do not delete the shared path", () => {
+  const f = fixture();
+  const target = path.join(f.home, "renamed");
+  const layer = f.layer("renamer", {
+    priority: 1,
+    targets: { old: { strategy: "copy", path: target } },
+    contributions: [{ target: "old", path: "source" }]
+  }, { source: "managed\n" });
+  ok(f.run("register", "renamer", layer));
+  ok(f.run("apply"));
+
+  f.write(target, "drift\n");
+  f.write(path.join(layer, "layer.json"), JSON.stringify({ version: 1, name: "renamer", priority: 1 }));
+  notOk(f.run("apply"), /stale managed target.*modified outside/);
+  assert.equal(fs.readFileSync(target, "utf8"), "drift\n");
+  ok(f.run("apply", "--force"));
+  assert.equal(fs.existsSync(target), false);
+
+  f.write(path.join(layer, "layer.json"), JSON.stringify({
+    version: 1,
+    name: "renamer",
+    priority: 1,
+    targets: { old: { strategy: "copy", path: target } },
+    contributions: [{ target: "old", path: "source" }]
+  }));
+  ok(f.run("apply"));
+  f.write(path.join(layer, "layer.json"), JSON.stringify({
+    version: 1,
+    name: "renamer",
+    priority: 1,
+    targets: { renamed: { strategy: "copy", path: target } },
+    contributions: [{ target: "renamed", path: "source" }]
+  }));
+  ok(f.run("apply"));
+  assert.equal(fs.readFileSync(target, "utf8"), "managed\n");
+  const state = JSON.parse(fs.readFileSync(path.join(f.state, "dotfiles-layer/managed.json"), "utf8"));
+  assert.equal(state.targets.old, undefined);
+  assert.equal(state.targets.renamed.path, target);
 });

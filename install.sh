@@ -6,11 +6,14 @@ shopt -s nullglob dotglob
 # Get the directory where this script is located
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 FILES_PATH="$SCRIPT_DIR/files"
-FORCE=false
+FORCE_LINKS=false
+LAYER_APPLY_MODE=""
 
 while [ $# -gt 0 ]; do
     case "$1" in
-        -f|--force) FORCE=true ;;
+        -f|--force|--force-links) FORCE_LINKS=true ;;
+        --adopt-layer) LAYER_APPLY_MODE="--adopt" ;;
+        --force-layer) LAYER_APPLY_MODE="--force" ;;
         *) echo "Unknown option: $1"; exit 1 ;;
     esac
     shift
@@ -49,9 +52,9 @@ adopt_git_config() {
     local loader_tilde="~/.local/state/dotfiles-layer/native/git-fragments/loader.gitconfig"
     local tmp
 
-    if [ "$FORCE" != true ] || [ ! -f "$dest" ] || [ -L "$dest" ]; then return 0; fi
+    if [ "$FORCE_LINKS" != true ] || [ ! -f "$dest" ] || [ -L "$dest" ]; then return 0; fi
 
-    tmp="$(mktemp "$FILES_PATH/.gitconfig.adopt.XXXXXX")"
+    tmp="$(mktemp "${TMPDIR:-/tmp}/dotfiles-gitconfig-adopt.XXXXXX")"
     cp "$dest" "$tmp"
     if ! git config --file "$tmp" --get-all include.path 2>/dev/null | grep -Fqx -e "$loader" -e "$loader_tilde"; then
         if ! git config --file "$tmp" --add include.path "$loader"; then
@@ -79,11 +82,26 @@ fi
 "$LAYER_ROOT/bootstrap.sh"
 git -C "$SCRIPT_DIR" submodule update --init --recursive
 
-adopt_git_config
 files=("$FILES_PATH"/*)
 
+# `ln -sfn SOURCE REAL_DIRECTORY` creates a nested link instead of replacing
+# the directory. Never guess that recursive deletion is safe, even with force.
+directory_errors=0
+for file in "${files[@]}"; do
+    [ -f "$file" ] || [ -d "$file" ] || continue
+    dest="$(dest_path "$file")"
+    if [ -d "$dest" ] && [ ! -L "$dest" ]; then
+        echo "Error: $dest is a real directory; move or remove it before linking $(basename "$file")" >&2
+        directory_errors=$((directory_errors + 1))
+    fi
+done
+if [ "$directory_errors" -gt 0 ]; then
+    echo "Aborting: $directory_errors directory conflict(s) found" >&2
+    exit 1
+fi
+
 # Preflight: check all destinations before creating any links
-if [ "$FORCE" = false ]; then
+if [ "$FORCE_LINKS" = false ]; then
     errors=0
     for file in "${files[@]}"; do
         [ -f "$file" ] || [ -d "$file" ] || continue
@@ -100,6 +118,26 @@ if [ "$FORCE" = false ]; then
     fi
 fi
 
+# Adopt the live Git config only once conflicts are ruled out, so a failed
+# install never mutates the tracked source.
+adopt_git_config
+
+# Content displaced by --force-links is preserved under the compositor's
+# state root; the compositor prunes backups older than 30 days on apply.
+BACKUP_ROOT=""
+backup_dest() {
+    local dest="$1" state_home backup
+    if [ -z "$BACKUP_ROOT" ]; then
+        state_home="${XDG_STATE_HOME:-$HOME/.local/state}"
+        case "$state_home" in /*) ;; *) state_home="$HOME/.local/state" ;; esac
+        BACKUP_ROOT="$state_home/dotfiles-layer/backups/$(date +%Y-%m-%dT%H-%M-%S)-$$"
+    fi
+    backup="$BACKUP_ROOT/${dest#/}"
+    mkdir -p "$(dirname "$backup")"
+    cp -pP "$dest" "$backup"
+    echo "Backed up $dest -> $backup"
+}
+
 # Create the links
 for file in "${files[@]}"; do
     [ -f "$file" ] || [ -d "$file" ] || continue
@@ -108,42 +146,21 @@ for file in "${files[@]}"; do
         echo "Already linked $(basename "$file") -> $dest"
         continue
     fi
+    # Only --force-links reaches this point with an existing destination;
+    # preflight aborts otherwise. Preserve whatever is being replaced.
+    if [ -e "$dest" ] || [ -L "$dest" ]; then
+        backup_dest "$dest"
+    fi
     mkdir -p "$(dirname "$dest")"
     ln -sfn "$file" "$dest"
     echo "Linked $(basename "$file") -> $dest"
 done
 
-# Register the personal layer without disturbing any other active layers, then
-# compose every active target. Existing unmanaged layered targets require the
-# installer's explicit --force option on first adoption.
+# Static-link replacement and compositor ownership are separate decisions.
+# Routine installs never bypass compositor drift/adoption checks.
 "$COMPOSITOR" register personal "$LAYER_ROOT"
 apply_args=()
-if [ "$FORCE" = true ]; then apply_args+=(--force); fi
+if [ -n "$LAYER_APPLY_MODE" ]; then apply_args+=("$LAYER_APPLY_MODE"); fi
 "$COMPOSITOR" apply "${apply_args[@]}"
-
-# Git and tmux loaders cannot portably express an XDG_STATE_HOME fallback.
-# Keep their public hooks generic by projecting compatibility links at the
-# default paths when a custom absolute state home is configured.
-dotfiles_state_home="${XDG_STATE_HOME:-$HOME/.local/state}"
-case "$dotfiles_state_home" in
-    /*) ;;
-    *) dotfiles_state_home="$HOME/.local/state" ;;
-esac
-for native_target in git-fragments tmux-fragments; do
-    actual_native="$dotfiles_state_home/dotfiles-layer/native/$native_target"
-    default_native="$HOME/.local/state/dotfiles-layer/native/$native_target"
-    if [ "$actual_native" = "$default_native" ]; then continue; fi
-
-    mkdir -p "$(dirname "$default_native")"
-    if [ -e "$default_native" ] || [ -L "$default_native" ]; then
-        if [ ! -L "$default_native" ] || [ "$(readlink "$default_native")" != "$actual_native" ]; then
-            echo "Error: cannot create XDG compatibility link at $default_native" >&2
-            exit 1
-        fi
-    else
-        ln -s "$actual_native" "$default_native"
-    fi
-done
-unset actual_native default_native dotfiles_state_home native_target
 
 echo "Done!"

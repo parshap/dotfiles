@@ -1,18 +1,59 @@
 # Dotfiles
 
-## Installation
+## Provisioning a new machine
 
 ```sh
-./install.sh
-# First migration when layered targets already exist:
-./install.sh --force
+# Prerequisite: Node.js 22+ and npm.
+git clone https://github.com/parshap/dotfiles.git ~/dotfiles
+~/dotfiles/install.sh
 ```
 
-The entries under `files/` are symlinked into `$HOME`; `__` in a filename means a path separator. Node.js 22+ and npm are hard prerequisites. The installer validates and bootstraps the package before changing home-directory dotfiles, then registers the public `personal` layer and applies all active layers. Missing/old Node, missing npm, or bootstrap failure exits nonzero instead of reporting partial success. The bootstrap hashes `package-lock.json`, so unchanged daily installs do not contact npm.
+The installer validates and bootstraps the compositor package before changing anything, then symlinks the entries under `files/` into `$HOME` (`__` in a filename means a path separator), registers the public `personal` layer, and applies all active layers. Missing/old Node, missing npm, or bootstrap failure exits nonzero instead of reporting partial success. The bootstrap hashes `package-lock.json`, so unchanged routine installs do not contact npm.
+
+On a populated home directory the installer refuses to replace anything it does not already own and reports every conflict before touching any file. Review the list, then either move the conflicting files away and rerun, or rerun with:
+
+```sh
+./install.sh --force-links    # replace reviewed static-file conflicts
+./install.sh --adopt-layer    # adopt identical existing composed targets
+./install.sh --force-layer    # replace reviewed composed-target drift
+```
+
+Every force path backs up whatever it displaces and prints the backup path; see "Force and backups" below. `--force` and `-f` remain aliases for `--force-links`; they never bypass compositor ownership or drift checks. Newly managed files whose destinations do not exist need no force option. Real directory conflicts are always refused rather than recursively deleted or accidentally nested.
 
 The small `files/bin__dotfiles-layer` launcher resolves its real public checkout through the live symlink and executes the package CLI.
 
-On the first `--force` migration, an existing regular `~/.gitconfig` is copied into `files/.gitconfig` before the live path is replaced by the public-repo symlink. This intentionally makes host-tool changes visible as public working-tree changes; review them carefully before committing or deliberately move stable private sections into the private layer.
+On the first `--force-links` migration, an existing regular `~/.gitconfig` is copied into `files/.gitconfig` before the live path is replaced by the public-repo symlink. This intentionally makes host-tool changes visible as public working-tree changes; review them carefully before committing or deliberately move stable private sections into the private layer.
+
+## Daily updates
+
+`dotfiles-update` (linked at `~/bin/dotfiles-update`) fetches upstream, replays uncommitted local edits on top via the stash, and reruns `./install.sh`. A zsh hook runs it in the background once per day; set `DOTFILES_AUTO_UPDATE=0` to disable the hook. Run `dotfiles-update` any time for a synchronous update.
+
+Background runs stay silent when nothing changed and everything is clean. Anything else — an update, uncommitted files in the checkout, composed-config drift, or a failure — leaves a one-line notice that prints at the next shell start. Notices point at per-day logs under `~/.cache/dotfiles-update/`.
+
+Update semantics:
+
+- Uncommitted changes (tracked and untracked) are stashed, replayed after the fast-forward, and restored exactly on any failure. If upstream conflicts with local edits, the update rolls back to the pre-update commit with the edits back in the working tree, and reports the conflict.
+- A run interrupted mid-update leaves local edits in the stash; the next run recovers them before doing anything else, and refuses to proceed (with manual recovery instructions) if they no longer apply cleanly.
+- Diverged history (unpushed local commits) is never rebased or reset; the run fails and says so.
+- A successful fast-forward followed by an installer failure leaves HEAD advanced; the next run reconverges from there.
+
+## Making and adopting changes
+
+Entries under `files/` are symlinked, so editing a live file edits this repo's working tree: `git -C ~/dotfiles diff` shows the change and committing publishes it. Host tools writing through those symlinks (for example into `~/.gitconfig`) appear the same way, and the daily update notice reports the uncommitted-file count so those edits stay visible.
+
+Composed targets (Pi/Claude settings, zsh/Git/tmux loaders) are generated output; editing them directly is drift. To inspect and adopt a live change:
+
+```sh
+dotfiles-layer check          # which targets differ
+dotfiles-layer diff TARGET    # live vs composed content
+dotfiles-layer explain TARGET # which layer sources contribute
+```
+
+Adopt the change by editing the listed contribution in the appropriate layer repo, running `dotfiles-layer apply TARGET`, and committing there. Discard it instead with `dotfiles-layer apply TARGET --force`. Note that `apply --adopt` only records ownership of output that is already identical; it never imports content.
+
+## Force and backups
+
+Anything a force path displaces — a static file replaced by `--force-links`, an unmanaged or drifted composed target replaced by `--force`, a drifted stale target pruned by `--force` — is first copied to `${XDG_STATE_HOME:-~/.local/state}/dotfiles-layer/backups/<timestamp>-<pid>/`, with the backup path printed. Backups are retained for 30 days. Content the compositor already tracks (managed output matching its recorded digest) is reproducible from the layers and is not backed up.
 
 ## Layered configuration
 
@@ -42,11 +83,11 @@ dotfiles-layer check [TARGET]
 dotfiles-layer apply [TARGET] [--adopt] [--force]
 ```
 
-Register always revalidates the manifest. Registering a name already resolving to the same canonical root is a true filesystem no-op; the same name at a different root is atomically retargeted. `check` and `diff` exit nonzero on differences. `--adopt` records an identical unmanaged target; `--force` replaces an unmanaged or unexpectedly modified target. Writes and native directory publication are staged/atomic, permission controlled, and protected by one state-root lock. No-op apply preserves target and ledger mtimes.
+Register always revalidates the manifest. Registering a name already resolving to the same canonical root is a true filesystem no-op; the same name at a different root is atomically retargeted. `check` and `diff` exit nonzero on differences. `--adopt` records an identical unmanaged target; `--force` replaces an unmanaged or unexpectedly modified target, backing up the displaced content first (see "Force and backups"). Writes and native directory publication are staged/atomic, permission controlled, and protected by one state-root lock. No-op apply preserves target and ledger mtimes.
 
 ### `managed.json` ownership semantics
 
-`managed.json` is only the compositor's ownership and drift ledger. For each applied target it stores the canonical output path, strategy, and last desired digest; it is not a source snapshot and cannot restore content. The compositor compares that record with the current projection before overwriting it.
+`managed.json` is only the compositor's ownership and drift ledger. For each applied target it stores the canonical output path, strategy, and last desired digest; it is not a source snapshot and cannot restore content. Content that a force path displaces is instead preserved under `backups/` in the state root. The compositor compares that record with the current projection before overwriting it. A full `check` reports ledger targets no longer declared by active manifests; a full `apply` removes those stale outputs only when they still match the recorded digest, and refuses drift unless `--force` is explicit. Target-specific apply does not prune unrelated state.
 
 Deleting `managed.json` intentionally forgets all ownership. Missing targets may then be created normally, identical existing targets require `apply --adopt`, and differing existing targets require `apply --force`. Re-adoption creates a fresh ledger. Deleting individual generated outputs while retaining the ledger causes the next apply to recreate them. There is no observe or snapshot command.
 
@@ -56,7 +97,7 @@ Deleting `managed.json` intentionally forgets all ownership. Missing targets may
 - zsh sources ordered fragments from the generated zsh projection.
 - `files/.gitconfig` is the public, tracked root Git config and ends with a generic include of the generated Git loader. Host tooling changes therefore visibly dirty this checkout. Private identity remains a native fragment.
 - tmux sources the generated tmux loader.
-- Git and tmux hooks use default state paths. With a custom absolute `XDG_STATE_HOME`, the installer creates compatibility symlinks from those default paths to the actual projections.
+- Git and tmux hooks reference the default state paths; a custom `XDG_STATE_HOME` is not supported for native loaders.
 
 ## Tests
 

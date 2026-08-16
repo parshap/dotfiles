@@ -11,7 +11,7 @@ npm test
 
 Dependencies are exact-versioned in `package-lock.json`. `bootstrap.sh` hashes that lockfile and runs `npm ci --ignore-scripts` only when `node_modules` is absent or the recorded lock hash changed, so routine installs do no npm network work.
 
-The package uses Ajv for manifest structure validation. `fast-json-patch` handles validated RFC 6902 operations, including arrays and root replacement, and `json-merge-patch` handles RFC 7396. Both libraries intentionally protect prototype-sensitive names, so `src/rfc.js` uses a narrow compatibility path only when a document, pointer, or value contains literal `__proto__`, `constructor`, or `prototype` members. This preserves those JSON members without prototype mutation or silent loss.
+The package uses Ajv for manifest structure validation. `fast-json-patch` handles validated RFC 6902 operations, including arrays and root replacement, and `json-merge-patch` handles RFC 7396. Documents, pointers, and values containing literal `__proto__`, `constructor`, or `prototype` members are rejected outright rather than special-cased.
 
 ## Layout
 
