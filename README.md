@@ -28,7 +28,10 @@ On the first `--force-links` migration, an existing regular `~/.gitconfig` is co
 
 `dotfiles-update` (linked at `~/bin/dotfiles-update`) fetches upstream, replays uncommitted local edits on top via the stash, and reruns `./install.sh`. A zsh hook runs it in the background once per day; set `DOTFILES_AUTO_UPDATE=0` to disable the hook. Run `dotfiles-update` any time for a synchronous update.
 
-Background runs stay silent when nothing changed and everything is clean. Anything else — an update, uncommitted files in the checkout, composed-config drift, or a failure — leaves a one-line notice that prints at the next shell start. Notices point at per-day logs under `~/.cache/dotfiles-update/`.
+Background runs stay silent when nothing changed and everything is clean. Reporting uses two files under `~/.cache/dotfiles-update/`:
+
+- **Alerts** (`alert`): failures. An alert re-prints at *every* shell start until a run completes successfully and clears it — a persistent problem cannot be missed once and forgotten.
+- **Notices** (`notice`): one-shot news — an update, uncommitted-file counts, composed-config drift. Each notice prints once at the next shell start, then is deleted. Both point at per-day logs kept for a week.
 
 Update semantics:
 

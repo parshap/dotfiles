@@ -8,10 +8,13 @@
 #                                has passed) spawns an update in the background
 #                                and returns immediately.
 #
-# Background runs append one-line notices to a file surfaced at the next shell
-# start. A run that finds nothing to report — no update, clean working tree,
-# clean composed config — stays silent; anything else leaves a notice.
-# Logs are kept per day under $STATE_DIR and pruned after a week.
+# Background runs report through two files surfaced by the next --shell-hook:
+#   alert   Failures. Re-printed at EVERY shell start until a run completes
+#           successfully and clears it. Never deleted by the hook.
+#   notice  One-shot news: updates, uncommitted-file counts, composed-config
+#           drift. Printed once, then deleted.
+# A run that finds nothing to report stays silent. Logs are kept per day
+# under $STATE_DIR and pruned after a week.
 
 set -u
 
@@ -24,6 +27,7 @@ DOTFILES_DIR="${DOTFILES_DIR:-$HOME/dotfiles}"
 STATE_DIR="${XDG_CACHE_HOME:-$HOME/.cache}/${LABEL}-update"
 LOG_FILE="$STATE_DIR/log.$(date +%Y-%m-%d)"
 NOTICE_FILE="$STATE_DIR/notice"
+ALERT_FILE="$STATE_DIR/alert"
 STAMP_FILE="$STATE_DIR/last-check"
 # Lock-wait budget in seconds; overridable for tests. A holder running a full
 # install (which may include package-manager work) can legitimately hold the
@@ -39,6 +43,7 @@ GLOBAL_LOCK_DIR="${XDG_CACHE_HOME:-$HOME/.cache}/dotfiles-update-install.lock"
 
 case "${1:-}" in
     --shell-hook)
+        [ -s "$ALERT_FILE" ] && cat "$ALERT_FILE"
         if [ -s "$NOTICE_FILE" ]; then
             cat "$NOTICE_FILE"
             rm -f "$NOTICE_FILE"
@@ -65,7 +70,14 @@ notice() {
         echo "$msg"
     fi
 }
-die() { notice "$@"; exit 1; }
+die() {
+    # Record the failure as the label's current alert so it keeps printing at
+    # every shell start until a successful run clears it. In synchronous mode
+    # also print it directly.
+    echo "[$LABEL] $*" > "$ALERT_FILE"
+    [ "$BACKGROUND" = "1" ] || echo "[$LABEL] $*"
+    exit 1
+}
 
 release_global_lock() {
     # Never remove a lock whose ownership is unverified: a reclaimer may have
@@ -184,6 +196,7 @@ REMOTE_HEAD=$(git rev-parse '@{u}' 2>/dev/null) \
 
 if [ "$LOCAL_HEAD" = "$REMOTE_HEAD" ]; then
     [ "$BACKGROUND" = "1" ] || notice "already up to date"
+    rm -f "$ALERT_FILE"
     report_health
     exit 0
 fi
@@ -226,4 +239,5 @@ fi
 ./install.sh >>"$LOG_FILE" 2>&1 || die "install.sh failed (see $LOG_FILE)"
 
 notice "updated $(git rev-parse --short "$LOCAL_HEAD") -> $(git rev-parse --short HEAD)"
+rm -f "$ALERT_FILE"
 report_health

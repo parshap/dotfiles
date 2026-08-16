@@ -66,6 +66,8 @@ function world(t) {
     marker: path.join(root, "install-marker"),
     lockDir: path.join(cache, "dotfiles-update-install.lock"),
     notice: path.join(cache, "test-update", "notice"),
+    alert: path.join(cache, "test-update", "alert"),
+    stamp: path.join(cache, "test-update", "last-check"),
   };
 }
 
@@ -231,6 +233,31 @@ test("up-to-date runs report uncommitted files and composed-config drift", (t) =
 // (EPERM even for own processes); the updater fails closed there, so the
 // liveness-dependent lock cases only run where signals work.
 const signalsDenied = spawnSync("bash", ["-c", "sleep 30 </dev/null >/dev/null 2>&1 & kill -0 $!"], { encoding: "utf8" }).status !== 0;
+
+test("failures persist as alerts until a run succeeds", (t) => {
+  const w = world(t);
+  fs.writeFileSync(path.join(w.work, "config.txt"), "local edit\n");
+  upstreamCommit(w, "config.txt", "upstream-v2\n");
+  fails(run(w), /upstream conflicts with local edits/);
+  assert.match(fs.readFileSync(w.alert, "utf8"), /upstream conflicts with local edits/);
+
+  // The hook re-prints alerts at every shell start but consumes notices.
+  fs.writeFileSync(w.notice, "[test] updated aaa -> bbb\n");
+  fs.writeFileSync(w.stamp, new Date().toISOString().slice(0, 10) + "\n");
+  let hook = ok(run(w, ["--shell-hook"]));
+  assert.match(hook.stdout, /upstream conflicts/);
+  assert.match(hook.stdout, /updated aaa -> bbb/);
+  assert.equal(fs.existsSync(w.notice), false);
+  hook = ok(run(w, ["--shell-hook"]));
+  assert.match(hook.stdout, /upstream conflicts/);
+  assert.doesNotMatch(hook.stdout, /updated aaa/);
+  assert.equal(fs.existsSync(w.alert), true);
+
+  // A successful run clears the alert.
+  git(w.work, ["checkout", "--", "config.txt"]);
+  ok(run(w));
+  assert.equal(fs.existsSync(w.alert), false);
+});
 
 test("a dead owner's lock is reclaimed; a live owner's lock is respected", { skip: signalsDenied }, (t) => {
   const w = world(t);
