@@ -4,7 +4,51 @@ import path from "node:path";
 import { LOCK_DIR, REGISTRY, STATE_FILE, STATE_ROOT } from "./config.js";
 import { composeRegistry, loadLayers, validateManifest } from "./manifest.js";
 import { applyJsonPatch, maskPointers, mergePatch, preservePointer } from "./rfc.js";
-import { clone, compareText, exists, fail, hash, isObject, jsonText, readJson, safeName } from "./util.js";
+import { clone, compareText, exists, fail, hash, hasOwn, isObject, jsonEqual, jsonText, readJson, safeName } from "./util.js";
+
+const MISSING = Symbol("missing");
+const isJsonStrategy = (target) => ["json-patch", "json-merge-patch"].includes(target.strategy);
+
+// Three-way merge of JSON documents with git-pull semantics: keys the layers
+// left unchanged keep local edits, keys only the layers changed take the new
+// desired value, and keys changed on both sides are conflicts. Arrays are
+// atomic. `base` is the desired content recorded at the last apply.
+function mergeJsonValue(base, live, desired, pointer, conflicts) {
+  const eq = (x, y) => (x === MISSING || y === MISSING) ? x === y : jsonEqual(x, y);
+  if (eq(desired, base)) return live;
+  if (eq(live, base) || eq(live, desired)) return desired;
+  if (isObject(base) && isObject(live) && isObject(desired)) {
+    const merged = {};
+    for (const key of new Set([...Object.keys(base), ...Object.keys(live), ...Object.keys(desired)])) {
+      const value = mergeJsonValue(
+        hasOwn(base, key) ? base[key] : MISSING,
+        hasOwn(live, key) ? live[key] : MISSING,
+        hasOwn(desired, key) ? desired[key] : MISSING,
+        `${pointer}/${key.replaceAll("~", "~0").replaceAll("/", "~1")}`,
+        conflicts
+      );
+      if (value !== MISSING) merged[key] = value;
+    }
+    return merged;
+  }
+  conflicts.push(pointer || "/");
+  return live;
+}
+
+// Drifted JSON targets merge local edits with the new desired content instead
+// of refusing. Returns null when merging is impossible (unparseable content).
+// Ledger records predate base content treat all current drift as local-only.
+function mergeStatus(plan, record, liveValue) {
+  let live, desired, base;
+  try {
+    live = liveValue ?? readJson(plan.target.path, `live target ${plan.target.path}`);
+    desired = JSON.parse(plan.content.toString("utf8"));
+    base = typeof record.content === "string" ? JSON.parse(record.content) : desired;
+  } catch { return null; }
+  const conflicts = [];
+  const merged = mergeJsonValue(base, live, desired, "", conflicts);
+  return { conflicts, mergedContent: Buffer.from(jsonText(merged)), mergedDigest: hash(jsonText(merged)), clean: conflicts.length === 0 };
+}
 
 function readLiveJson(targetPath) {
   if (!exists(targetPath)) return {};
@@ -151,10 +195,15 @@ function statusFor(plan, state) {
     }
   }
   const modeCurrent = plan.kind !== "file" || actual === null || actual === "wrong-kind" || (fs.lstatSync(plan.target.path).mode & 0o777) === modeFor(plan);
+  let merge;
+  if (plan.kind === "file" && isJsonStrategy(plan.target) && record && actual !== null && actual !== "wrong-kind" && actual !== plan.digest) {
+    merge = mergeStatus(plan, record);
+  }
   return {
     actual,
     actualControlledDigest,
     record,
+    merge,
     current: actual === plan.digest && modeCurrent,
     managed: Boolean(record && record.path === plan.target.path),
   };
@@ -339,7 +388,15 @@ export function apply(targetId, options) {
         && status.actualControlledDigest === status.record.controlledDigest
       );
       if (status.managed && status.record.digest !== status.actual && !options.force && !acceptsLiveBase && !onlyPreservedFieldsChanged) {
-        fail(`${plan.target.id}: managed target was modified outside the compositor; inspect with: dotfiles-layer diff ${plan.target.id}; to keep the change, adopt it into the layer source (see: dotfiles-layer explain ${plan.target.id}); to discard it: dotfiles-layer apply ${plan.target.id} --force (the modified content is backed up first)`);
+        if (status.merge?.clean) {
+          // Local edits to keys the layers did not change ride along (git-pull
+          // semantics); only same-key changes on both sides conflict.
+          plan.mergedContent = status.merge.mergedContent;
+        } else if (status.merge) {
+          fail(`${plan.target.id}: both the layers and local edits changed ${status.merge.conflicts.join(", ")}; inspect with: dotfiles-layer diff ${plan.target.id}; to keep the local change, adopt it into the layer source (see: dotfiles-layer explain ${plan.target.id}); to discard it: dotfiles-layer apply ${plan.target.id} --force (the modified content is backed up first)`);
+        } else {
+          fail(`${plan.target.id}: managed target was modified outside the compositor; inspect with: dotfiles-layer diff ${plan.target.id}; to keep the change, adopt it into the layer source (see: dotfiles-layer explain ${plan.target.id}); to discard it: dotfiles-layer apply ${plan.target.id} --force (the modified content is backed up first)`);
+        }
       }
     }
 
@@ -366,14 +423,24 @@ export function apply(targetId, options) {
     for (const plan of plans) {
       const status = statusFor(plan, state);
       if (!status.current) {
-        // Managed content matching its recorded digest is reproducible from
-        // the layers; anything else being displaced is preserved first.
-        const reproducible = status.managed && status.record.digest === status.actual;
-        if (status.actual !== null && !reproducible) backupExisting(plan.target.path);
-        if (plan.kind === "file") atomicFile(plan.target.path, plan.content, modeFor(plan));
-        else if (plan.kind === "symlink") atomicSymlink(plan.target.path, plan.source);
-        else publishNative(plan);
-        changed++;
+        if (plan.mergedContent) {
+          // A clean three-way merge loses nothing: local edits to keys the
+          // layers did not touch are preserved in the merged output, so no
+          // backup is needed. Skip the write when it changes nothing.
+          if (status.merge.mergedDigest !== status.actual) {
+            atomicFile(plan.target.path, plan.mergedContent, modeFor(plan));
+            changed++;
+          }
+        } else {
+          // Managed content matching its recorded digest is reproducible from
+          // the layers; anything else being displaced is preserved first.
+          const reproducible = status.managed && status.record.digest === status.actual;
+          if (status.actual !== null && !reproducible) backupExisting(plan.target.path);
+          if (plan.kind === "file") atomicFile(plan.target.path, plan.content, modeFor(plan));
+          else if (plan.kind === "symlink") atomicSymlink(plan.target.path, plan.source);
+          else publishNative(plan);
+          changed++;
+        }
       }
       state.targets[plan.target.id] = {
         path: plan.target.path,
@@ -381,6 +448,7 @@ export function apply(targetId, options) {
         digest: plan.digest,
         ...(plan.target.app ? { app: plan.target.app } : {}),
         ...(plan.controlledDigest ? { controlledDigest: plan.controlledDigest } : {}),
+        ...(plan.kind === "file" && isJsonStrategy(plan.target) ? { content: plan.content.toString("utf8") } : {}),
       };
       persistState();
     }
@@ -491,10 +559,16 @@ export function check(targetId, showDiff = false) {
   let different = 0;
   for (const plan of plans) {
     const status = statusFor(plan, state);
-    const label = status.current ? "unchanged" : status.actual === null ? "missing" : "different";
+    // Local overrides that merge cleanly are expected state, not a problem:
+    // they ride along on future applies and do not affect the exit code.
+    const label = status.current ? "unchanged"
+      : status.actual === null ? "missing"
+      : status.merge?.clean ? "local overrides"
+      : status.merge ? `conflict at ${status.merge.conflicts.join(", ")}`
+      : "different";
     console.log(`${plan.target.id}: ${label}${status.managed ? " (managed)" : " (unmanaged)"}`);
     if (!status.current) {
-      different++;
+      if (label !== "local overrides") different++;
       if (showDiff) {
         console.log(`--- ${plan.target.path}\n+++ composed:${plan.target.id}`);
         const lines = diffLines(printablePlan(plan, false), printablePlan(plan, true));

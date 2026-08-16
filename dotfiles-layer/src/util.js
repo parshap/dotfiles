@@ -13,6 +13,17 @@ export const setOwn = (object, key, value) => Object.defineProperty(object, key,
   configurable: true,
 });
 export const compareText = (a, b) => a < b ? -1 : a > b ? 1 : 0;
+export function jsonEqual(a, b) {
+  if (a === b) return true;
+  if (Array.isArray(a) || Array.isArray(b)) return Array.isArray(a) && Array.isArray(b) && a.length === b.length && a.every((value, i) => jsonEqual(value, b[i]));
+  if (isObject(a) || isObject(b)) {
+    if (!isObject(a) || !isObject(b)) return false;
+    const aKeys = Object.keys(a).sort();
+    const bKeys = Object.keys(b).sort();
+    return aKeys.length === bKeys.length && aKeys.every((key, i) => key === bKeys[i] && jsonEqual(a[key], b[key]));
+  }
+  return false;
+}
 export const hash = (value) => crypto.createHash("sha256").update(value).digest("hex");
 export const jsonText = (value) => `${JSON.stringify(value, null, 2)}\n`;
 export const exists = (file) => {

@@ -137,7 +137,7 @@ acquire_global_lock() {
 # tooling writing through managed symlinks) and composed-config drift. Prints
 # nothing when everything is clean.
 report_health() {
-    local parts="" dirty_count check_output drifted self_dir compositor self_source self_link
+    local parts="" dirty_count check_output check_status attention overrides self_dir compositor self_source self_link
     dirty_count="$(git status --porcelain 2>/dev/null | wc -l | tr -d ' ')"
     if [ "$dirty_count" != "0" ]; then
         parts="$dirty_count uncommitted file(s) (see: git -C \"$DOTFILES_DIR\" status)"
@@ -157,10 +157,15 @@ report_health() {
     self_dir="$(cd "$(dirname "$self_source")" && pwd -P)"
     compositor="$self_dir/bin__dotfiles-layer"
     if [ -f "$compositor" ]; then
-        if ! check_output="$("$compositor" check 2>&1)"; then
-            drifted="$(printf '%s\n' "$check_output" | awk -F: '/: (different|missing|stale)/ {print $1}' | paste -sd, -)"
-            parts="${parts:+$parts; }composed config needs attention: ${drifted:-run dotfiles-layer check}"
+        check_output="$("$compositor" check 2>&1)" && check_status=0 || check_status=$?
+        attention="$(printf '%s\n' "$check_output" | awk -F: '/: (different|missing|stale|conflict)/ {print $1}' | paste -sd, -)"
+        overrides="$(printf '%s\n' "$check_output" | awk -F: '/: local overrides/ {print $1}' | paste -sd, -)"
+        if [ -n "$attention" ]; then
+            parts="${parts:+$parts; }composed config needs attention: $attention"
+        elif [ "$check_status" -ne 0 ]; then
+            parts="${parts:+$parts; }composed config needs attention: run dotfiles-layer check"
         fi
+        [ -n "$overrides" ] && parts="${parts:+$parts; }local config overrides: $overrides (see: dotfiles-layer diff)"
     fi
     [ -n "$parts" ] && notice "$parts"
     return 0
@@ -238,6 +243,11 @@ fi
 
 ./install.sh >>"$LOG_FILE" 2>&1 || die "install.sh failed (see $LOG_FILE)"
 
-notice "updated $(git rev-parse --short "$LOCAL_HEAD") -> $(git rev-parse --short HEAD)"
+if [ "$(git rev-parse HEAD)" = "$LOCAL_HEAD" ]; then
+    # Ahead-only: the ff was a no-op, but the install still refreshed.
+    notice "no upstream changes (local commits are ahead); install refreshed"
+else
+    notice "updated $(git rev-parse --short "$LOCAL_HEAD") -> $(git rev-parse --short HEAD)"
+fi
 rm -f "$ALERT_FILE"
 report_health

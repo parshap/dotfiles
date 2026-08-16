@@ -31,7 +31,7 @@ On the first `--force-links` migration, an existing regular `~/.gitconfig` is co
 Background runs stay silent when nothing changed and everything is clean. Reporting uses two files under `~/.cache/dotfiles-update/`:
 
 - **Alerts** (`alert`): failures. An alert re-prints at *every* shell start until a run completes successfully and clears it — a persistent problem cannot be missed once and forgotten.
-- **Notices** (`notice`): one-shot news — an update, uncommitted-file counts, composed-config drift. Each notice prints once at the next shell start, then is deleted. Both point at per-day logs kept for a week.
+- **Notices** (`notice`): one-shot news — an update, uncommitted-file counts, composed-config problems, and any local config overrides in effect. Each notice prints once at the next shell start, then is deleted. Both point at per-day logs kept for a week.
 
 Update semantics:
 
@@ -44,10 +44,10 @@ Update semantics:
 
 Entries under `files/` are symlinked, so editing a live file edits this repo's working tree: `git -C ~/dotfiles diff` shows the change and committing publishes it. Host tools writing through those symlinks (for example into `~/.gitconfig`) appear the same way, and the daily update notice reports the uncommitted-file count so those edits stay visible.
 
-Composed targets (Pi/Claude settings, zsh/Git/tmux loaders) are generated output; editing them directly is drift. To inspect and adopt a live change:
+Composed targets (Pi/Claude settings, zsh/Git/tmux loaders) are generated output; editing them directly creates *local overrides*. JSON targets (`json-patch`/`json-merge-patch`) merge overrides the way `git pull` merges a dirty file: keys the layers did not change keep their local values, keys only the layers changed take the new value, and a key changed on both sides fails the apply with the conflicting pointer named. Local overrides are expected state — `check` reports them as `local overrides` without failing — while non-JSON targets (`copy`, `concat`, `symlink`, `native-include`) are fully layer-owned and still refuse any drift. To inspect and adopt a live change:
 
 ```sh
-dotfiles-layer check          # which targets differ
+dotfiles-layer check          # which targets differ, and how
 dotfiles-layer diff TARGET    # live vs composed content
 dotfiles-layer explain TARGET # which layer sources contribute
 ```
@@ -90,7 +90,7 @@ Register always revalidates the manifest. Registering a name already resolving t
 
 ### `managed.json` ownership semantics
 
-`managed.json` is only the compositor's ownership and drift ledger. For each applied target it stores the canonical output path, strategy, and last desired digest; it is not a source snapshot and cannot restore content. Content that a force path displaces is instead preserved under `backups/` in the state root. The compositor compares that record with the current projection before overwriting it. A full `check` reports ledger targets no longer declared by active manifests; a full `apply` removes those stale outputs only when they still match the recorded digest, and refuses drift unless `--force` is explicit. Target-specific apply does not prune unrelated state.
+`managed.json` is only the compositor's ownership and drift ledger. For each applied target it stores the canonical output path, strategy, and last desired digest; for JSON targets it also stores the last-applied desired content, which serves as the merge base for three-way merges. It is not a restore source: content that a force path displaces is preserved under `backups/` in the state root. Ledger records written before base content existed treat all current drift as local-only on their next apply. The compositor compares that record with the current projection before overwriting it. A full `check` reports ledger targets no longer declared by active manifests; a full `apply` removes those stale outputs only when they still match the recorded digest, and refuses drift unless `--force` is explicit. Target-specific apply does not prune unrelated state.
 
 Deleting `managed.json` intentionally forgets all ownership. Missing targets may then be created normally, identical existing targets require `apply --adopt`, and differing existing targets require `apply --force`. Re-adoption creates a fresh ledger. Deleting individual generated outputs while retaining the ledger causes the next apply to recreate them. There is no observe or snapshot command.
 

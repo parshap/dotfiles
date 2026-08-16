@@ -209,15 +209,20 @@ test("up-to-date runs report uncommitted files and composed-config drift", (t) =
   result = ok(run(w));
   assert.match(result.stdout, /1 uncommitted file\(s\)/);
 
-  // Drift a composed target and expect the health line to name it.
+  // Drift a composed target and expect the health line to name it. A JSON
+  // target with local-only drift merges cleanly and is reported as overrides.
   const layer = path.join(w.root, "layer");
   fs.mkdirSync(layer);
   fs.writeFileSync(path.join(layer, "layer.json"), JSON.stringify({
     version: 1, name: "layer", priority: 1,
-    targets: { cfg: { strategy: "copy", path: path.join(w.home, "out.txt") } },
-    contributions: [{ target: "cfg", path: "src.txt" }],
+    targets: {
+      cfg: { strategy: "copy", path: path.join(w.home, "out.txt") },
+      cfgjson: { strategy: "json-merge-patch", path: path.join(w.home, "out.json"), base: "empty" },
+    },
+    contributions: [{ target: "cfg", path: "src.txt" }, { target: "cfgjson", path: "src.json" }],
   }));
   fs.writeFileSync(path.join(layer, "src.txt"), "managed\n");
+  fs.writeFileSync(path.join(layer, "src.json"), JSON.stringify({ model: "a" }));
   const env = {
     ...process.env, ...GIT_ENV,
     HOME: w.home, XDG_CACHE_HOME: w.cache, XDG_CONFIG_HOME: w.config, XDG_STATE_HOME: w.state,
@@ -225,8 +230,10 @@ test("up-to-date runs report uncommitted files and composed-config drift", (t) =
   assert.equal(spawnSync(COMPOSITOR, ["register", "layer", layer], { env, encoding: "utf8" }).status, 0);
   assert.equal(spawnSync(COMPOSITOR, ["apply"], { env, encoding: "utf8" }).status, 0);
   fs.writeFileSync(path.join(w.home, "out.txt"), "drifted\n");
+  fs.writeFileSync(path.join(w.home, "out.json"), JSON.stringify({ model: "local", extra: 1 }));
   result = ok(run(w));
   assert.match(result.stdout, /composed config needs attention: cfg/);
+  assert.match(result.stdout, /local config overrides: cfgjson/);
 });
 
 // Signal-based liveness is unavailable in sandboxes that deny kill(2)

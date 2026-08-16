@@ -249,7 +249,7 @@ test("accepts declared live-base and preserved-field changes during a later sour
 
   f.write(target, '{"managed":999,"runtime":"third"}');
   f.write(path.join(layer, "settings.patch.json"), '[{"op":"add","path":"/managed","value":3}]');
-  notOk(f.run("apply"), /modified outside/);
+  notOk(f.run("apply"), /both the layers and local edits changed \/managed/);
   ok(f.run("apply", "--force"));
   assert.deepEqual(JSON.parse(fs.readFileSync(target, "utf8")), { managed: 3, runtime: "third" });
 });
@@ -290,6 +290,74 @@ test("protects unmanaged files and supports matching adoption and explicit force
   notOk(f.run("apply"), /modified outside/);
   ok(f.run("apply", "--force"));
   assert.equal(fs.lstatSync(desired).isFile(), true);
+});
+
+test("JSON targets merge local overrides git-pull style and fail only on same-key conflicts", () => {
+  const f = fixture();
+  const target = path.join(f.home, "out/settings.json");
+  const writePatch = (ops) => f.write(path.join(layerDir, "patch.json"), JSON.stringify(ops));
+  const live = () => JSON.parse(fs.readFileSync(target, "utf8"));
+  const layerDir = f.layer("layer", {
+    priority: 1,
+    targets: { settings: { strategy: "json-patch", path: target, base: "empty" } },
+    contributions: [{ target: "settings", path: "patch.json" }]
+  }, { "patch.json": "[]" });
+  ok(f.run("register", "layer", layerDir));
+  writePatch([
+    { op: "add", path: "/model", value: "a" },
+    { op: "add", path: "/theme", value: "light" },
+    { op: "add", path: "/nested", value: { keep: 1 } }
+  ]);
+  ok(f.run("apply"));
+
+  // Local-only drift rides along: check reports overrides without failing,
+  // and apply preserves the drift while recording the new merge base.
+  f.write(target, JSON.stringify({ model: "local", theme: "light", nested: { keep: 1 }, extra: true }));
+  assert.match(ok(f.run("check")).stdout, /settings: local overrides/);
+  ok(f.run("apply"));
+  assert.deepEqual(live(), { model: "local", theme: "light", nested: { keep: 1 }, extra: true });
+
+  // An upstream change to an unrelated key applies while the drift persists.
+  writePatch([
+    { op: "add", path: "/model", value: "a" },
+    { op: "add", path: "/theme", value: "dark" },
+    { op: "add", path: "/nested", value: { keep: 1 } }
+  ]);
+  ok(f.run("apply"));
+  assert.deepEqual(live(), { model: "local", theme: "dark", nested: { keep: 1 }, extra: true });
+
+  // A same-key change on both sides conflicts, names the pointer, and writes nothing.
+  writePatch([
+    { op: "add", path: "/model", value: "upstream" },
+    { op: "add", path: "/theme", value: "dark" },
+    { op: "add", path: "/nested", value: { keep: 1 } }
+  ]);
+  notOk(f.run("apply"), /both the layers and local edits changed \/model/);
+  assert.match(notOk(f.run("check")).stdout, /settings: conflict at \/model/);
+  assert.equal(live().model, "local");
+
+  // Force discards the local change; afterwards upstream key deletion applies
+  // to locally-unchanged keys but conflicts with local edits to that key.
+  ok(f.run("apply", "--force"));
+  assert.deepEqual(live(), { model: "upstream", theme: "dark", nested: { keep: 1 } });
+  writePatch([{ op: "add", path: "/model", value: "upstream" }]);
+  ok(f.run("apply"));
+  assert.deepEqual(live(), { model: "upstream" });
+  writePatch([{ op: "add", path: "/model", value: "upstream" }, { op: "add", path: "/nested", value: { keep: 2 } }]);
+  ok(f.run("apply"));
+  f.write(target, JSON.stringify({ model: "upstream", nested: { keep: "local" } }));
+  writePatch([{ op: "add", path: "/model", value: "upstream" }]);
+  notOk(f.run("apply"), /both the layers and local edits changed \/nested/);
+
+  // Ledger records predating base content treat current drift as local-only.
+  const stateFile = path.join(f.state, "dotfiles-layer/managed.json");
+  ok(f.run("apply", "--force"));
+  const state = JSON.parse(fs.readFileSync(stateFile, "utf8"));
+  delete state.targets.settings.content;
+  fs.writeFileSync(stateFile, JSON.stringify(state, null, 2) + "\n");
+  f.write(target, JSON.stringify({ model: "legacy-local", extra: true }));
+  ok(f.run("apply"));
+  assert.equal(live().model, "legacy-local");
 });
 
 test("rejects target paths inside the compositor state root", () => {
