@@ -6,7 +6,7 @@ NEVER create a pull request, push a branch, or perform other "external world wri
 
 In git repos, local commits are always ok. Commit work in logical increments when possible.
 
-Draft pull requests in a PR.md file using GitHub Flavored Markdown.
+Draft pull requests in a PR.md file using GitHub Flavored Markdown (soft line wraps are preserved). PR.md's first line is the title; the body begins after it.
 
 ## Editing plans and specs
 
@@ -14,7 +14,7 @@ When revising a plan or spec, rewrite relevant parts to state only the current d
 
 ## Prefer fresh-context subagents
 
-For implementation, code review, testing, validation, and long-running work, use fresh-context subagents with a compact, self-contained contract: the problem, intent, settled decisions, relevant paths, and expected handoff. Fork only when the conversation itself is the review target or contains essential uncaptured context that cannot be summarized safely.
+For implementation, review, testing, validation, and long-running work, use fresh-context subagents with a compact, self-contained contract: the problem, intent, settled decisions, relevant paths, and expected handoff. Fork only when the conversation itself is the review target or contains essential uncaptured context that cannot be summarized safely.
 
 ## Multi-model reviews
 
