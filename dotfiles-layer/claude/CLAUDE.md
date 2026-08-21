@@ -1,3 +1,5 @@
+## Local by default
+
 NEVER create a pull request, push a branch, or perform other "external world writes" without permission, even in "auto mode".
 
 ## Commits and pull requests
