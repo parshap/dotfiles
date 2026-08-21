@@ -4,7 +4,7 @@ NEVER create a pull request, push a branch, or perform other "external world wri
 
 In git repos, local commits are always ok. Commit work in logical increments when possible.
 
-Draft pull requests in a PR.md file using GitHub Flavored Markdown.
+Draft pull requests in a PR.md file using GitHub Flavored Markdown (soft line wraps are preserved). PR.md's first line is the title; the body begins after it.
 
 ## Editing plans and specs
 
