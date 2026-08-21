@@ -16,17 +16,9 @@ When revising a plan or spec, rewrite relevant parts to state only the current d
 
 For implementation, code review, testing, validation, and long-running work, use fresh-context subagents with a compact, self-contained contract: the problem, intent, settled decisions, relevant paths, and expected handoff. Fork only when the conversation itself is the review target or contains essential uncaptured context that cannot be summarized safely.
 
-## Multi-model code reviews
+## Multi-model reviews
 
-Review fan-out is coverage, not consensus: one fresh-context read-only reviewer per angle, and the result is the union of findings. Ask each reviewer for findings with `file:line` and severity so the reports are comparable. Synthesize and apply fixes yourself; never delegate synthesis.
-
-Derive the angles from the request and the actual diff. A user-supplied list is a seed — when they say "and more", propose further angles grounded in what changed, and name every angle you ran.
-
-Give each reviewer an explicit `model:` on its `runs.run` / `runs.all` item, rotating the configured roster across the angles so no model family owns an angle. Model diversity is the mechanism; without it the review has correlated blind spots. Re-running the same angles with the roster rotated by one is the cheap decorrelation check.
-
-`subagent action:models` reports each agent's default model, not what is reachable — never infer from it that only one model is available. Session `enabledModels` scopes the interactive picker, not subagent children.
-
-Re-run only reviewers relevant to unresolved significant findings. Do not use an implicit conversation fork to review a concrete diff. Escalate to `/council` only for a disputed finding or a material tradeoff, never for coverage.
+Use fresh-context subagents with diverse models and review angles. Derive angles from the request; add further angles grounded in what changed. Set each reviewer's model explicitly; otherwise they inherit yours. Synthesize findings yourself.
 
 ## Minimize tool output
 
