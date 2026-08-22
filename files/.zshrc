@@ -95,13 +95,6 @@ precmd_functions+=(_reset_terminal_modes)
 # Aliases
 alias ta='tmux attach'
 
-# Auto-update the dotfiles repo in the background, once per day.
-# Provided by ~/bin/dotfiles-update (managed by this repo).
-# Set DOTFILES_AUTO_UPDATE=0 to disable.
-if [ "${DOTFILES_AUTO_UPDATE:-1}" != "0" ] && command -v dotfiles-update >/dev/null 2>&1; then
-	dotfiles-update --shell-hook
-fi
-
 # Auto-attach to tmux. Only when:
 # - It's an SSH connection
 # - Not already in tmux
@@ -134,3 +127,10 @@ if [[ -d "$_dotfiles_layer_zsh_dir" ]]; then
 	done
 fi
 unset _dotfiles_layer_fragment _dotfiles_layer_state_home _dotfiles_layer_zsh_dir
+
+# Run updates only after layer fragments have established the final managed
+# environment, including Homebrew's PATH.
+# Set DOTFILES_AUTO_UPDATE=0 to disable.
+if [ "${DOTFILES_AUTO_UPDATE:-1}" != "0" ] && command -v dotfiles-update >/dev/null 2>&1; then
+	dotfiles-update --shell-hook
+fi
