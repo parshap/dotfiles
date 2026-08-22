@@ -1,9 +1,9 @@
 #!/usr/bin/env node
 import process from "node:process";
-import { apply, check, explain, printLayers, register, unregister } from "./compositor.js";
+import { apply, explain, printLayers, register, status, unregister } from "./compositor.js";
 
 function usage() {
-  console.error("Usage: dotfiles-layer <register NAME PATH|unregister NAME|layers|explain [TARGET]|diff [TARGET]|check [TARGET]|apply [TARGET] [--adopt] [--force]>");
+  console.error("Usage: dotfiles-layer <register NAME PATH|unregister NAME|layers|explain [TARGET]|status [TARGET]|diff [TARGET]|apply [TARGET] [--adopt] [--force]>");
 }
 
 export function main(argv) {
@@ -13,8 +13,9 @@ export function main(argv) {
     case "unregister": if (args.length !== 1) return usage(), 2; unregister(args[0]); break;
     case "layers": if (args.length) return usage(), 2; printLayers(); break;
     case "explain": if (args.length > 1) return usage(), 2; explain(args[0]); break;
-    case "check":
-    case "diff": if (args.length > 1) return usage(), 2; check(args[0], command === "diff"); break;
+    case "status":
+    case "check": // backwards-compatible alias for status
+    case "diff": if (args.length > 1) return usage(), 2; status(args[0], command === "diff"); break;
     case "apply": {
       let targetId;
       const options = { adopt: false, force: false };

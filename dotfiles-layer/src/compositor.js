@@ -1,6 +1,8 @@
 import crypto from "node:crypto";
 import fs from "node:fs";
+import os from "node:os";
 import path from "node:path";
+import { spawnSync } from "node:child_process";
 import { LOCK_DIR, REGISTRY, STATE_FILE, STATE_ROOT } from "./config.js";
 import { composeRegistry, loadLayers, validateManifest } from "./manifest.js";
 import { applyJsonPatch, maskPointers, mergePatch, preservePointer } from "./rfc.js";
@@ -8,6 +10,9 @@ import { clone, compareText, exists, fail, hash, hasOwn, isObject, jsonEqual, js
 
 const MISSING = Symbol("missing");
 const isJsonStrategy = (target) => ["json-patch", "json-merge-patch"].includes(target.strategy);
+// Strategies whose drifted live content can be three-way merged against the
+// recorded merge base: JSON documents key-by-key, text files line-by-line.
+const isMergeableStrategy = (target) => isJsonStrategy(target) || ["copy", "concat"].includes(target.strategy);
 
 // Three-way merge of JSON documents with git-pull semantics: keys the layers
 // left unchanged keep local edits, keys only the layers changed take the new
@@ -35,19 +40,43 @@ function mergeJsonValue(base, live, desired, pointer, conflicts) {
   return live;
 }
 
-// Drifted JSON targets merge local edits with the new desired content instead
-// of refusing. Returns null when merging is impossible (unparseable content).
-// Ledger records predate base content treat all current drift as local-only.
-function mergeStatus(plan, record, liveValue) {
-  let live, desired, base;
+// Drifted mergeable targets merge local edits with the new desired content
+// instead of refusing. Returns null when merging is impossible (unparseable
+// content, merge tool failure). Ledger records predating base content treat
+// all current drift as local-only.
+function mergeStatus(plan, record) {
+  if (isJsonStrategy(plan.target)) {
+    let live, desired, base;
+    try {
+      live = readJson(plan.target.path, `live target ${plan.target.path}`);
+      desired = JSON.parse(plan.content.toString("utf8"));
+      base = typeof record.content === "string" ? JSON.parse(record.content) : desired;
+    } catch { return null; }
+    const conflicts = [];
+    const merged = mergeJsonValue(base, live, desired, "", conflicts);
+    const mergedContent = Buffer.from(jsonText(merged));
+    return { conflicts, mergedContent, mergedDigest: hash(mergedContent), clean: conflicts.length === 0 };
+  }
+  // copy/concat: line-based three-way merge via git merge-file (current=live,
+  // base=recorded, other=desired), never writing the live file in place.
+  const baseText = typeof record.content === "string" ? record.content : plan.content.toString("utf8");
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "dotfiles-layer-merge-"));
   try {
-    live = liveValue ?? readJson(plan.target.path, `live target ${plan.target.path}`);
-    desired = JSON.parse(plan.content.toString("utf8"));
-    base = typeof record.content === "string" ? JSON.parse(record.content) : desired;
-  } catch { return null; }
-  const conflicts = [];
-  const merged = mergeJsonValue(base, live, desired, "", conflicts);
-  return { conflicts, mergedContent: Buffer.from(jsonText(merged)), mergedDigest: hash(jsonText(merged)), clean: conflicts.length === 0 };
+    const baseFile = path.join(dir, "base");
+    const desiredFile = path.join(dir, "desired");
+    fs.writeFileSync(baseFile, baseText);
+    fs.writeFileSync(desiredFile, plan.content);
+    const result = spawnSync("git", ["merge-file", "-p", plan.target.path, baseFile, desiredFile], { encoding: "utf8" });
+    if (result.error || typeof result.status !== "number" || result.status < 0) return null;
+    return {
+      conflicts: result.status ? [`${result.status} overlapping line region(s)`] : [],
+      mergedContent: Buffer.from(result.stdout),
+      mergedDigest: hash(result.stdout),
+      clean: result.status === 0,
+    };
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
 }
 
 function readLiveJson(targetPath) {
@@ -196,7 +225,7 @@ function statusFor(plan, state) {
   }
   const modeCurrent = plan.kind !== "file" || actual === null || actual === "wrong-kind" || (fs.lstatSync(plan.target.path).mode & 0o777) === modeFor(plan);
   let merge;
-  if (plan.kind === "file" && isJsonStrategy(plan.target) && record && actual !== null && actual !== "wrong-kind" && actual !== plan.digest) {
+  if (plan.kind === "file" && isMergeableStrategy(plan.target) && record && actual !== null && actual !== "wrong-kind" && actual !== plan.digest) {
     merge = mergeStatus(plan, record);
   }
   return {
@@ -448,7 +477,7 @@ export function apply(targetId, options) {
         digest: plan.digest,
         ...(plan.target.app ? { app: plan.target.app } : {}),
         ...(plan.controlledDigest ? { controlledDigest: plan.controlledDigest } : {}),
-        ...(plan.kind === "file" && isJsonStrategy(plan.target) ? { content: plan.content.toString("utf8") } : {}),
+        ...(plan.kind === "file" && isMergeableStrategy(plan.target) ? { content: plan.content.toString("utf8") } : {}),
       };
       persistState();
     }
@@ -553,7 +582,7 @@ function printablePlan(plan, desired) {
   return `${entries.join("\n")}\n${loader}`;
 }
 
-export function check(targetId, showDiff = false) {
+export function status(targetId, showDiff = false) {
   const { targets, plans } = makePlans(targetId);
   const state = readState();
   let different = 0;

@@ -111,7 +111,7 @@ test("composes every strategy, orders layers, implements RFC patches, native loa
   assert.match(explanation, /high \(priority 20\).*source=.*high\.txt/);
   assert.doesNotMatch(explanation, /low\n\nhigh/);
 
-  notOk(f.run("check"));
+  notOk(f.run("status"));
   assert.match(notOk(f.run("diff", "copy")).stdout, /\+high copy/);
   ok(f.run("apply", "--force"));
   assert.equal(fs.realpathSync(p.symlink), fs.realpathSync(path.join(high, "high-link")));
@@ -136,7 +136,7 @@ test("composes every strategy, orders layers, implements RFC patches, native loa
   const tmuxLoader = fs.readFileSync(path.join(native, "tmux/loader.conf"), "utf8");
   assert.match(tmuxLoader, /000-low-base\.conf/);
   assert.match(tmuxLoader, /001-high-work\.conf/);
-  ok(f.run("check"));
+  ok(f.run("status"));
 
   const copyMtime = fs.statSync(p.copy).mtimeMs;
   const nativeMtime = fs.statSync(path.join(native, "git")).mtimeMs;
@@ -280,8 +280,10 @@ test("protects unmanaged files and supports matching adoption and explicit force
   f.write(desired, "same\n");
   notOk(f.run("apply"), /unmanaged.*--adopt/);
   ok(f.run("apply", "--adopt"));
+  // Drift on a mergeable target rides along instead of refusing; force still discards it.
   f.write(desired, "local edit\n");
-  notOk(f.run("apply"), /modified outside/);
+  ok(f.run("apply"));
+  assert.equal(fs.readFileSync(desired, "utf8"), "local edit\n");
   ok(f.run("apply", "--force"));
   assert.equal(fs.readFileSync(desired, "utf8"), "same\n");
 
@@ -313,7 +315,7 @@ test("JSON targets merge local overrides git-pull style and fail only on same-ke
   // Local-only drift rides along: check reports overrides without failing,
   // and apply preserves the drift while recording the new merge base.
   f.write(target, JSON.stringify({ model: "local", theme: "light", nested: { keep: 1 }, extra: true }));
-  assert.match(ok(f.run("check")).stdout, /settings: local overrides/);
+  assert.match(ok(f.run("status")).stdout, /settings: local overrides/);
   ok(f.run("apply"));
   assert.deepEqual(live(), { model: "local", theme: "light", nested: { keep: 1 }, extra: true });
 
@@ -333,7 +335,7 @@ test("JSON targets merge local overrides git-pull style and fail only on same-ke
     { op: "add", path: "/nested", value: { keep: 1 } }
   ]);
   notOk(f.run("apply"), /both the layers and local edits changed \/model/);
-  assert.match(notOk(f.run("check")).stdout, /settings: conflict at \/model/);
+  assert.match(notOk(f.run("status")).stdout, /settings: conflict at \/model/);
   assert.equal(live().model, "local");
 
   // Force discards the local change; afterwards upstream key deletion applies
@@ -358,6 +360,54 @@ test("JSON targets merge local overrides git-pull style and fail only on same-ke
   f.write(target, JSON.stringify({ model: "legacy-local", extra: true }));
   ok(f.run("apply"));
   assert.equal(live().model, "legacy-local");
+});
+
+test("copy and concat targets merge local edits line-by-line like git pull", () => {
+  const f = fixture();
+  const concatTarget = path.join(f.home, "out/notes.md");
+  const copyTarget = path.join(f.home, "out/list.txt");
+  const layerDir = f.layer("layer", {
+    priority: 1,
+    targets: {
+      notes: { strategy: "concat", path: concatTarget },
+      list: { strategy: "copy", path: copyTarget }
+    },
+    contributions: [
+      { target: "notes", path: "a.txt" },
+      { target: "notes", path: "b.txt" },
+      { target: "list", path: "list.txt" }
+    ]
+  }, { "a.txt": "alpha\n", "b.txt": "bravo\n", "list.txt": "one\ntwo\nthree\n" });
+  ok(f.run("register", "layer", layerDir));
+  ok(f.run("apply"));
+  assert.equal(fs.readFileSync(concatTarget, "utf8"), "alpha\nbravo\n");
+  // "check" remains an alias for "status".
+  assert.match(ok(f.run("check")).stdout, /notes: unchanged/);
+
+  // Local edits ride along; upstream line changes apply alongside them.
+  f.write(concatTarget, "alpha\nbravo\nlocal note\n");
+  f.write(copyTarget, "one\nTWO\nthree\n");
+  assert.match(ok(f.run("status")).stdout, /notes: local overrides/);
+  f.write(path.join(layerDir, "a.txt"), "ALPHA\n");
+  ok(f.run("apply"));
+  assert.equal(fs.readFileSync(concatTarget, "utf8"), "ALPHA\nbravo\nlocal note\n");
+  assert.equal(fs.readFileSync(copyTarget, "utf8"), "one\nTWO\nthree\n");
+
+  // Overlapping line edits conflict, name the overlap, and write nothing.
+  f.write(path.join(layerDir, "list.txt"), "one\nupstream\nthree\n");
+  notOk(f.run("apply"), /both the layers and local edits changed/);
+  assert.match(notOk(f.run("status")).stdout, /list: conflict/);
+  assert.equal(fs.readFileSync(copyTarget, "utf8"), "one\nTWO\nthree\n");
+
+  // Legacy records without base content treat current drift as local-only.
+  ok(f.run("apply", "--force"));
+  const stateFile = path.join(f.state, "dotfiles-layer/managed.json");
+  const state = JSON.parse(fs.readFileSync(stateFile, "utf8"));
+  delete state.targets.list.content;
+  fs.writeFileSync(stateFile, JSON.stringify(state, null, 2) + "\n");
+  f.write(copyTarget, "one\nlegacy-local\nthree\n");
+  ok(f.run("apply"));
+  assert.equal(fs.readFileSync(copyTarget, "utf8"), "one\nlegacy-local\nthree\n");
 });
 
 test("rejects target paths inside the compositor state root", () => {
@@ -436,7 +486,7 @@ test("rejects malformed registries, traversal, unknown targets, duplicate defini
     const f = fixture();
     const bad = f.layer("bad", { priority: 1, contributions: [{ target: "missing", path: "x" }] }, { x: "x" });
     ok(f.run("register", "bad", bad));
-    notOk(f.run("check"), /unknown target/);
+    notOk(f.run("status"), /unknown target/);
   }
   {
     const f = fixture();
@@ -444,7 +494,7 @@ test("rejects malformed registries, traversal, unknown targets, duplicate defini
     const one = f.layer("one", { priority: 1, targets: { x: { strategy: "copy", path: path1 } }, contributions: [{ target: "x", path: "x" }] }, { x: "x" });
     const two = f.layer("two", { priority: 2, targets: { x: { strategy: "copy", path: path1 } }, contributions: [{ target: "x", path: "x" }] }, { x: "x" });
     ok(f.run("register", "one", one)); ok(f.run("register", "two", two));
-    notOk(f.run("check"), /duplicate target definition/);
+    notOk(f.run("status"), /duplicate target definition/);
   }
   {
     const f = fixture();
@@ -453,20 +503,20 @@ test("rejects malformed registries, traversal, unknown targets, duplicate defini
       a: { strategy: "copy", path: collisionPath }, b: { strategy: "copy", path: collisionPath }
     } });
     ok(f.run("register", "one", layer));
-    notOk(f.run("check"), /target path collision/);
+    notOk(f.run("status"), /target path collision/);
   }
   {
     const f = fixture();
     const one = f.layer("one", { priority: 1, targets: { z: { strategy: "native-include", app: "zsh" } }, contributions: [{ target: "z", name: "same", path: "a" }] }, { a: "a" });
     const two = f.layer("two", { priority: 2, contributions: [{ target: "z", name: "same", path: "b" }] }, { b: "b" });
     ok(f.run("register", "one", one)); ok(f.run("register", "two", two));
-    notOk(f.run("check"), /duplicate native-include name/);
+    notOk(f.run("status"), /duplicate native-include name/);
   }
   {
     const f = fixture();
     const layer = f.layer("one", { priority: 1, targets: { x: { strategy: "copy", path: path.join(f.home, "x") } }, contributions: [{ target: "x", path: "a" }, { target: "x", path: "b" }] }, { a: "a", b: "b" });
     ok(f.run("register", "one", layer));
-    notOk(f.run("check"), /ambiguous winning contributions/);
+    notOk(f.run("status"), /ambiguous winning contributions/);
   }
 });
 
@@ -481,7 +531,7 @@ test("JSON Patch rejects invalid pointers, failed tests, array bounds, and moves
     const f = fixture();
     const layer = f.layer("bad", { priority: 1, targets: { p: { strategy: "json-patch", path: path.join(f.home, "p.json") } }, contributions: [{ target: "p", path: "patch.json" }] }, { "patch.json": JSON.stringify(patch) });
     ok(f.run("register", "bad", layer));
-    notOk(f.run("check"), /JSON (pointer|Patch)|array index|move/);
+    notOk(f.run("status"), /JSON (pointer|Patch)|array index|move/);
   }
 });
 
@@ -576,7 +626,7 @@ test("full apply prunes clean stale targets and reports them in check", () => {
   assert.equal(fs.existsSync(target), true);
 
   f.write(path.join(layer, "layer.json"), JSON.stringify({ version: 1, name: "pruner", priority: 1 }));
-  const check = notOk(f.run("check"));
+  const check = notOk(f.run("status"));
   assert.match(check.stdout, /old: stale \(managed\)/);
   assert.match(ok(f.run("apply")).stdout, /1 pruned/);
   assert.equal(fs.existsSync(target), false);

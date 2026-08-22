@@ -229,6 +229,8 @@ test("up-to-date runs report uncommitted files and composed-config drift", (t) =
   };
   assert.equal(spawnSync(COMPOSITOR, ["register", "layer", layer], { env, encoding: "utf8" }).status, 0);
   assert.equal(spawnSync(COMPOSITOR, ["apply"], { env, encoding: "utf8" }).status, 0);
+  // Change the same line upstream and locally so the copy target conflicts.
+  fs.writeFileSync(path.join(layer, "src.txt"), "changed\n");
   fs.writeFileSync(path.join(w.home, "out.txt"), "drifted\n");
   fs.writeFileSync(path.join(w.home, "out.json"), JSON.stringify({ model: "local", extra: 1 }));
   result = ok(run(w));

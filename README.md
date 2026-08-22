@@ -44,10 +44,10 @@ Update semantics:
 
 Entries under `files/` are symlinked, so editing a live file edits this repo's working tree: `git -C ~/dotfiles diff` shows the change and committing publishes it. Host tools writing through those symlinks (for example into `~/.gitconfig`) appear the same way, and the daily update notice reports the uncommitted-file count so those edits stay visible.
 
-Composed targets (Pi/Claude settings, zsh/Git/tmux loaders) are generated output; editing them directly creates *local overrides*. JSON targets (`json-patch`/`json-merge-patch`) merge overrides the way `git pull` merges a dirty file: keys the layers did not change keep their local values, keys only the layers changed take the new value, and a key changed on both sides fails the apply with the conflicting pointer named. Local overrides are expected state — `check` reports them as `local overrides` without failing — while non-JSON targets (`copy`, `concat`, `symlink`, `native-include`) are fully layer-owned and still refuse any drift. To inspect and adopt a live change:
+Composed targets (Pi/Claude settings, zsh/Git/tmux loaders) are generated output; editing them directly creates *local overrides*. JSON targets (`json-patch`/`json-merge-patch`) merge overrides the way `git pull` merges a dirty file — key by key — and text targets (`copy`, `concat`) do the same line by line via `git merge-file`: content the layers did not change keeps its local edits, content only the layers changed takes the new value, and overlapping changes on both sides fail the apply with the conflict named. Local overrides are expected state — `status` reports them as `local overrides` without failing — while `symlink` and `native-include` targets are structurally layer-owned and still refuse drift (editing through their links edits the layer repos directly). To inspect and adopt a live change:
 
 ```sh
-dotfiles-layer check          # which targets differ, and how
+dotfiles-layer status         # which targets differ, and how
 dotfiles-layer diff TARGET    # live vs composed content
 dotfiles-layer explain TARGET # which layer sources contribute
 ```
@@ -82,15 +82,15 @@ dotfiles-layer unregister NAME
 dotfiles-layer layers
 dotfiles-layer explain [TARGET]
 dotfiles-layer diff [TARGET]
-dotfiles-layer check [TARGET]
+dotfiles-layer status [TARGET]  # 'check' remains an alias
 dotfiles-layer apply [TARGET] [--adopt] [--force]
 ```
 
-Register always revalidates the manifest. Registering a name already resolving to the same canonical root is a true filesystem no-op; the same name at a different root is atomically retargeted. `check` and `diff` exit nonzero on differences. `--adopt` records an identical unmanaged target; `--force` replaces an unmanaged or unexpectedly modified target, backing up the displaced content first (see "Force and backups"). Writes and native directory publication are staged/atomic, permission controlled, and protected by one state-root lock. No-op apply preserves target and ledger mtimes.
+Register always revalidates the manifest. Registering a name already resolving to the same canonical root is a true filesystem no-op; the same name at a different root is atomically retargeted. `status` and `diff` exit nonzero on actionable differences (clean local overrides do not count). `--adopt` records an identical unmanaged target; `--force` replaces an unmanaged or unexpectedly modified target, backing up the displaced content first (see "Force and backups"). Writes and native directory publication are staged/atomic, permission controlled, and protected by one state-root lock. No-op apply preserves target and ledger mtimes.
 
 ### `managed.json` ownership semantics
 
-`managed.json` is only the compositor's ownership and drift ledger. For each applied target it stores the canonical output path, strategy, and last desired digest; for JSON targets it also stores the last-applied desired content, which serves as the merge base for three-way merges. It is not a restore source: content that a force path displaces is preserved under `backups/` in the state root. Ledger records written before base content existed treat all current drift as local-only on their next apply. The compositor compares that record with the current projection before overwriting it. A full `check` reports ledger targets no longer declared by active manifests; a full `apply` removes those stale outputs only when they still match the recorded digest, and refuses drift unless `--force` is explicit. Target-specific apply does not prune unrelated state.
+`managed.json` is only the compositor's ownership and drift ledger. For each applied target it stores the canonical output path, strategy, and last desired digest; for mergeable targets (JSON and text) it also stores the last-applied desired content, which serves as the merge base for three-way merges. It is not a restore source: content that a force path displaces is preserved under `backups/` in the state root. Ledger records written before base content existed treat all current drift as local-only on their next apply. The compositor compares that record with the current projection before overwriting it. A full `status` reports ledger targets no longer declared by active manifests; a full `apply` removes those stale outputs only when they still match the recorded digest, and refuses drift unless `--force` is explicit. Target-specific apply does not prune unrelated state.
 
 Deleting `managed.json` intentionally forgets all ownership. Missing targets may then be created normally, identical existing targets require `apply --adopt`, and differing existing targets require `apply --force`. Re-adoption creates a fresh ledger. Deleting individual generated outputs while retaining the ledger causes the next apply to recreate them. There is no observe or snapshot command.
 

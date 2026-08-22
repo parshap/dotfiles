@@ -157,13 +157,13 @@ report_health() {
     self_dir="$(cd "$(dirname "$self_source")" && pwd -P)"
     compositor="$self_dir/bin__dotfiles-layer"
     if [ -f "$compositor" ]; then
-        check_output="$("$compositor" check 2>&1)" && check_status=0 || check_status=$?
+        check_output="$("$compositor" status 2>&1)" && check_status=0 || check_status=$?
         attention="$(printf '%s\n' "$check_output" | awk -F: '/: (different|missing|stale|conflict)/ {print $1}' | paste -sd, -)"
         overrides="$(printf '%s\n' "$check_output" | awk -F: '/: local overrides/ {print $1}' | paste -sd, -)"
         if [ -n "$attention" ]; then
             parts="${parts:+$parts; }composed config needs attention: $attention"
         elif [ "$check_status" -ne 0 ]; then
-            parts="${parts:+$parts; }composed config needs attention: run dotfiles-layer check"
+            parts="${parts:+$parts; }composed config needs attention: run dotfiles-layer status"
         fi
         [ -n "$overrides" ] && parts="${parts:+$parts; }local config overrides: $overrides (see: dotfiles-layer diff)"
     fi
