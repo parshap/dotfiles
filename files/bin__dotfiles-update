@@ -176,6 +176,20 @@ acquire_global_lock
 cd "$DOTFILES_DIR" 2>/dev/null || die "$DOTFILES_DIR not found"
 : > "$LOG_FILE"
 
+# Run every git command against a snapshot of the global config taken now,
+# while it is known-good. ~/.gitconfig is itself a managed symlink into this
+# repo: a failed stash replay can write conflict markers into it mid-run, and
+# git refuses to run at all under an unparseable global config — which
+# previously broke the rollback path too. The snapshot keeps credentials,
+# identity, and includes working no matter what happens to the live file
+# during the update.
+if [ -f "$HOME/.gitconfig" ]; then
+    cp "$HOME/.gitconfig" "$STATE_DIR/gitconfig.snapshot" 2>>"$LOG_FILE" \
+        && export GIT_CONFIG_GLOBAL="$STATE_DIR/gitconfig.snapshot"
+fi
+git config --list >/dev/null 2>>"$LOG_FILE" \
+    || die "git config is broken; fix $HOME/.gitconfig before updating (see $LOG_FILE)"
+
 # Restore local edits a previous run left in the stash (e.g. it was killed
 # between stashing and replaying). Do this first so the normal flow below
 # treats recovered edits like any other local change.
