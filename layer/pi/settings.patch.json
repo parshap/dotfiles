@@ -13,7 +13,7 @@
     ]
   },
   { "op": "add", "path": "/defaultThinkingLevel", "value": "xhigh" },
-  { "op": "add", "path": "/treeFilterMode", "value": "user-only" },
+  { "op": "add", "path": "/treeFilterMode", "value": "no-tools" },
   { "op": "add", "path": "/theme", "value": "light/dark" },
   { "op": "add", "path": "/tuiMode", "value": "fullscreen" },
   {
