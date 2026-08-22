@@ -15,3 +15,11 @@ When revising a plan or spec, rewrite relevant parts to state only the current d
 ## Dotfiles
 
 Some configuration files under `$HOME` are managed by `dotfiles-layer`; before editing one, follow its extension-point comment or use `dotfiles-layer explain <target>` to find the source instead of changing generated output.
+
+## Web fetch blocked public content
+
+If web fetch of public content is blocked (like Reddit), try:
+
+```bash
+curl "http://archive.org/wayback/available?url=<url>"
+```
