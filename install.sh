@@ -57,7 +57,9 @@ adopt_git_config() {
     tmp="$(mktemp "${TMPDIR:-/tmp}/dotfiles-gitconfig-adopt.XXXXXX")"
     cp "$dest" "$tmp"
     if ! git config --file "$tmp" --get-all include.path 2>/dev/null | grep -Fqx -e "$loader" -e "$loader_tilde"; then
-        if ! git config --file "$tmp" --add include.path "$loader"; then
+        # Keep the generated loader last so its conditional identity can
+        # override the public default for matching repositories.
+        if ! printf '\n[include]\n\tpath = %s\n' "$loader_tilde" >> "$tmp"; then
             rm -f "$tmp"
             return 1
         fi

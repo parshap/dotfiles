@@ -153,7 +153,7 @@ test("composes every strategy, orders layers, implements RFC patches, native loa
 });
 
 const externalOverlayLayer = process.env.DOTFILES_OVERLAY_LAYER;
-test("real personal and external overlay manifests preserve live Claude and Pi application state", { skip: !externalOverlayLayer }, () => {
+test("real personal and external overlay manifests preserve application state and conditional Git identity", { skip: !externalOverlayLayer }, () => {
   const f = fixture();
   const personal = path.resolve(TEST_DIR, "../../layer");
   const overlay = path.resolve(externalOverlayLayer);
@@ -204,6 +204,49 @@ test("real personal and external overlay manifests preserve live Claude and Pi a
   assert.equal(claude.effortLevel, "xhigh");
   assert.ok(fs.readFileSync(path.join(f.home, ".pi/agent/AGENTS.md"), "utf8").includes(overlayAgents));
   assert.equal(fs.readdirSync(path.join(f.state, "dotfiles-layer/native/zsh-fragments/fragments")).length, zshContributionCount);
+
+  const identityConditionsContribution = overlayManifest.contributions.find((item) => item.target === "git-fragments" && item.name === "identity-conditions");
+  assert.ok(identityConditionsContribution);
+  const identityConditions = fs.readFileSync(path.join(overlay, identityConditionsContribution.path), "utf8");
+  const identityPath = identityConditions.match(/^\s*path\s*=\s*(~\/.+)$/mu)?.[1];
+  const workRootPattern = identityConditions.match(/\[includeIf "gitdir\/i:(~\/[^"]+)"\]/u)?.[1];
+  const remotePatterns = [...identityConditions.matchAll(/\[includeIf "hasconfig:remote\.\*\.url:([^"]+)"\]/gu)].map((match) => match[1]);
+  const httpsPattern = remotePatterns.find((pattern) => pattern.startsWith("https://"));
+  const scpPattern = remotePatterns.find((pattern) => pattern.startsWith("git@"));
+  assert.ok(identityPath && workRootPattern && httpsPattern && scpPattern);
+
+  const identityConfig = path.join(f.home, identityPath.slice(2));
+  assert.equal(fs.lstatSync(identityConfig).isSymbolicLink(), true);
+  const expectedIdentity = ok(spawnSync("git", ["config", "--file", identityConfig, "--get", "user.email"], { encoding: "utf8" })).stdout.trim();
+  const gitLoader = path.join(f.state, "dotfiles-layer/native/git-fragments/loader.gitconfig");
+  const personalIdentity = "personal@example.invalid";
+  const rootGitConfig = path.join(f.home, ".gitconfig");
+  ok(spawnSync("git", ["config", "--file", rootGitConfig, "user.email", personalIdentity], { encoding: "utf8" }));
+  ok(spawnSync("git", ["config", "--file", rootGitConfig, "--add", "include.path", gitLoader], { encoding: "utf8" }));
+  const gitEnv = { ...process.env, HOME: f.home, GIT_CONFIG_GLOBAL: rootGitConfig, GIT_CONFIG_NOSYSTEM: "1" };
+  const runGit = (repo, ...args) => spawnSync("git", ["-C", repo, ...args], { env: gitEnv, encoding: "utf8" });
+  const initRepo = (repo) => {
+    fs.mkdirSync(repo, { recursive: true });
+    ok(runGit(repo, "init", "-q"));
+  };
+
+  const workByPath = path.join(f.home, workRootPattern.slice(2), "path-match");
+  initRepo(workByPath);
+  assert.equal(ok(runGit(workByPath, "config", "user.email")).stdout.trim(), expectedIdentity);
+
+  const workByHttpsRemote = path.join(f.home, "elsewhere/https-match");
+  initRepo(workByHttpsRemote);
+  ok(runGit(workByHttpsRemote, "remote", "add", "origin", httpsPattern.replace(/\/\*\*$/u, "/example/repo.git")));
+  assert.equal(ok(runGit(workByHttpsRemote, "config", "user.email")).stdout.trim(), expectedIdentity);
+
+  const workBySshRemote = path.join(f.home, "elsewhere/ssh-match");
+  initRepo(workBySshRemote);
+  ok(runGit(workBySshRemote, "remote", "add", "origin", scpPattern.replace(/:\*\*\/\*\*$/u, ":example/repo.git")));
+  assert.equal(ok(runGit(workBySshRemote, "config", "user.email")).stdout.trim(), expectedIdentity);
+
+  const personalRepo = path.join(f.home, "projects/personal/no-match");
+  initRepo(personalRepo);
+  assert.equal(ok(runGit(personalRepo, "config", "user.email")).stdout.trim(), personalIdentity);
 });
 
 test("rejects prototype-sensitive member names in JSON documents and contributions", () => {
