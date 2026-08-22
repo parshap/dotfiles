@@ -6,7 +6,7 @@
  * basic-16 ANSI palette (so colors inherit the terminal's own theme), and
  * prints one row:
  *
- *   where  ⎇ branch ……… Model · effort · ctx N% · $cost
+ *   where  ⎇ branch ……… Model · effort · ctx N% · 5h N% @t | 7d N% @t · $cost
  *
  * Stateless: one stdin read + one cheap `git branch`, no temp files.
  * Invoked via ~/.claude/statusline.sh.
@@ -40,6 +40,12 @@ const tokens = usage
 	? (usage.input_tokens ?? 0) + (usage.cache_creation_input_tokens ?? 0) + (usage.cache_read_input_tokens ?? 0)
 	: null;
 
+// Subscription usage windows (Pro/Max only, after the first API response);
+// each window may be independently absent.
+const limitWindow = (w) =>
+	w?.used_percentage != null ? { pct: w.used_percentage, resetsAt: w.resets_at ?? null } : null;
+const rl = input.rate_limits;
+
 const { left, right } = buildStatus({
 	where: repo || collapsePath(homeAbbrev(cwd)),
 	branch: branch || null,
@@ -51,6 +57,7 @@ const { left, right } = buildStatus({
 	tokens,
 	window: input.context_window?.context_window_size ?? null,
 	cost: input.cost?.total_cost_usd ?? 0,
+	limits: rl ? { fiveHour: limitWindow(rl.five_hour), sevenDay: limitWindow(rl.seven_day) } : null,
 });
 
 // Roles → explicit grays + basic-16 accent colors. Both gray levels are
@@ -80,10 +87,15 @@ const paint = (seg) => {
 	return seg.href ? `\x1b]8;;${seg.href}\x07${text}\x1b]8;;\x07` : text;
 };
 
-// Reserve a few columns rather than hugging the true edge: Claude Code
-// indents this row and uses its right end for notifications / the verbose
-// token counter, so rendering to full COLUMNS gets clipped with an ellipsis.
+// Reserve columns rather than hugging the true edge. Claude Code pads the
+// row by 2 columns on each side (observed), so anything longer than
+// COLUMNS - 4 gets clipped with an ellipsis. It also injects chips at the
+// row's right end ("/rc active", MCP errors, update notices, the verbose
+// token counter) with no way to detect them from here — leave a standing
+// allowance so the common "/rc active" chip fits without wrapping the row.
+const PADDING = 4;
+const CHIP_ALLOWANCE = 12;
 const columns = Number(process.env.COLUMNS) || 0;
-const gap = columns > 0 ? gapFor(columns, plain(left), plain(right), 3) : 6;
+const gap = columns > 0 ? gapFor(columns, plain(left), plain(right), PADDING + CHIP_ALLOWANCE) : 6;
 
 process.stdout.write(left.map(paint).join("") + " ".repeat(gap) + right.map(paint).join("") + "\n");

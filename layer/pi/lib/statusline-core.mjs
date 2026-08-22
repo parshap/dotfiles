@@ -17,11 +17,13 @@
  * A segment may carry `href` for a terminal hyperlink (OSC 8).
  *
  * @typedef {{ text: string, role: string, href?: string }} Segment
+ * @typedef {{ pct: number, resetsAt?: number|null }} LimitWindow  // resetsAt: Unix epoch seconds
  * @typedef {{
  *   where: string, branch?: string|null, pr?: { number: number, url: string }|null,
  *   modelId: string, modelDisplay?: string, thinking?: string,
  *   status?: Segment,  // optional extra chip, placed after thinking, before ctx
  *   pct?: number|null, tokens?: number|null, window?: number|null, cost?: number,
+ *   limits?: { fiveHour?: LimitWindow|null, sevenDay?: LimitWindow|null }|null,
  * }} StatusData
  */
 
@@ -30,6 +32,31 @@ export function ctxLevel(pct) {
 	if (pct >= 60) return "ctx-danger";
 	if (pct >= 40) return "ctx-warn";
 	return "ctx-ok";
+}
+
+/**
+ * Rate-limit-% gradient level. Later thresholds than ctxLevel: context quality
+ * degrades early, but a usage window only matters near exhaustion.
+ */
+export function limitLevel(pct) {
+	if (pct >= 90) return "ctx-danger";
+	if (pct >= 70) return "ctx-warn";
+	return "ctx-ok";
+}
+
+/**
+ * Format a limit-window reset instant: clock time within 24h ("3pm", "3:05pm"),
+ * short weekday beyond ("Wed").
+ */
+export function fmtReset(unixSeconds, nowMs = Date.now()) {
+	const t = new Date(unixSeconds * 1000);
+	if (unixSeconds * 1000 - nowMs < 24 * 60 * 60 * 1000) {
+		const h12 = t.getHours() % 12 || 12;
+		const m = t.getMinutes();
+		const ap = t.getHours() >= 12 ? "pm" : "am";
+		return m ? `${h12}:${String(m).padStart(2, "0")}${ap}` : `${h12}${ap}`;
+	}
+	return t.toLocaleDateString("en-US", { weekday: "short" });
 }
 
 /** Format token count: 12345 → "12.3k", 200000 → "200k", 1500000 → "1.5M" */
@@ -104,7 +131,7 @@ export function buildStatus(d) {
 		}
 	}
 
-	// ── session state (right): model · thinking · ctx N% tok/win · $cost ────
+	// ── session state (right): model · thinking · ctx N% tok/win · 5h N% @t | 7d N% @t · $cost ────
 	const right = [];
 	const dot = () => right.push({ text: " · ", role: "dim" });
 	right.push({ text: modelLabel(d.modelId, d.modelDisplay), role: "text" });
@@ -126,6 +153,21 @@ export function buildStatus(d) {
 			const win = d.window ? `/${fmtTokens(d.window)}` : "";
 			right.push({ text: ` ${fmtTokens(d.tokens)}${win}`, role: "dim" });
 		}
+	}
+	// Subscription usage windows, absent for API-key sessions and before the
+	// first API response — each chip renders only when its data exists, so the
+	// cluster appears inward while $cost keeps the right-edge anchor.
+	const limitChip = (label, w) => {
+		right.push({ text: `${label} `, role: "dim" });
+		right.push({ text: `${Math.round(w.pct)}%`, role: limitLevel(w.pct) });
+		if (w.resetsAt != null) right.push({ text: ` @${fmtReset(w.resetsAt)}`, role: "dim" });
+	};
+	const lim = d.limits;
+	if (lim?.fiveHour || lim?.sevenDay) {
+		dot();
+		if (lim.fiveHour) limitChip("5h", lim.fiveHour);
+		if (lim.fiveHour && lim.sevenDay) right.push({ text: " | ", role: "dim" });
+		if (lim.sevenDay) limitChip("7d", lim.sevenDay);
 	}
 	dot();
 	right.push({ text: `$${(d.cost ?? 0).toFixed(2)}`, role: "text" });
