@@ -8,7 +8,7 @@ git clone https://github.com/parshap/dotfiles.git ~/dotfiles
 ~/dotfiles/install.sh
 ```
 
-The installer validates and bootstraps the compositor package before changing anything, then symlinks the entries under `files/` into `$HOME` (`__` in a filename means a path separator), registers the public `personal` layer, and applies all active layers. Missing/old Node, missing npm, or bootstrap failure exits nonzero instead of reporting partial success. The bootstrap hashes `package-lock.json`, so unchanged routine installs do not contact npm.
+The installer validates and bootstraps the compositor package (`dotfiles-layer/`) before changing anything, then symlinks the entries under `files/` into `$HOME` (`__` in a filename means a path separator), registers the public `personal` layer (`layer/`), and applies all active layers. Missing/old Node, missing npm, or bootstrap failure exits nonzero instead of reporting partial success. The bootstrap hashes `package-lock.json`, so unchanged routine installs do not contact npm.
 
 On a populated home directory the installer refuses to replace anything it does not already own and reports every conflict before touching any file. Review the list, then either move the conflicting files away and rerun, or rerun with:
 

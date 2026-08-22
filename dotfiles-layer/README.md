@@ -19,6 +19,6 @@ The package uses Ajv for manifest structure validation. `fast-json-patch` handle
 - `src/manifest.js`: schema, path containment, registry loading, and target resolution
 - `src/rfc.js`: JSON Pointer/Patch/Merge Patch boundary
 - `src/compositor.js`: planning, native projections, atomic publication, locking, and ownership checks
-- `layer.json` and adjacent resources: the personal layer
+- `../layer/`: the personal layer (manifest and contributions); deliberately separate from this package directory so the layer root contains only layer data
 
 Use the installed `dotfiles-layer` launcher rather than invoking source modules directly. See the repository README for commands and state semantics.

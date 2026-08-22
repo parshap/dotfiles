@@ -67,7 +67,10 @@ adopt_git_config() {
 }
 
 COMPOSITOR="$FILES_PATH/bin__dotfiles-layer"
-LAYER_ROOT="$SCRIPT_DIR/dotfiles-layer"
+# The compositor package and the personal layer are separate directories:
+# the package is tooling, the layer is data consumed through it.
+PACKAGE_DIR="$SCRIPT_DIR/dotfiles-layer"
+LAYER_ROOT="$SCRIPT_DIR/layer"
 
 if ! command -v node >/dev/null 2>&1 || ! command -v npm >/dev/null 2>&1; then
     echo "Error: Node.js 22+ and npm are required; no dotfiles were installed." >&2
@@ -79,7 +82,7 @@ if [ "$NODE_MAJOR" -lt 22 ]; then
     exit 1
 fi
 
-"$LAYER_ROOT/bootstrap.sh"
+"$PACKAGE_DIR/bootstrap.sh"
 git -C "$SCRIPT_DIR" submodule update --init --recursive
 
 files=("$FILES_PATH"/*)

@@ -7,7 +7,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { spawnSync } from "node:child_process";
 import { applyJsonPatch, mergePatch } from "../src/rfc.js";
-import { compileStatusPromotions, selectPromotedStatus } from "../pi/lib/statusline-promotions.mjs";
+import { compileStatusPromotions, selectPromotedStatus } from "../../layer/pi/lib/statusline-promotions.mjs";
 
 const TEST_DIR = path.dirname(fileURLToPath(import.meta.url));
 const CLI = path.resolve(TEST_DIR, "../../files/bin__dotfiles-layer");
@@ -155,7 +155,7 @@ test("composes every strategy, orders layers, implements RFC patches, native loa
 const externalOverlayLayer = process.env.DOTFILES_OVERLAY_LAYER;
 test("real personal and external overlay manifests preserve live Claude and Pi application state", { skip: !externalOverlayLayer }, () => {
   const f = fixture();
-  const personal = path.resolve(TEST_DIR, "..");
+  const personal = path.resolve(TEST_DIR, "../../layer");
   const overlay = path.resolve(externalOverlayLayer);
   const overlayManifest = JSON.parse(fs.readFileSync(path.join(overlay, "layer.json"), "utf8"));
   const personalPatch = JSON.parse(fs.readFileSync(path.join(personal, "pi/settings.patch.json"), "utf8"));
