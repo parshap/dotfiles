@@ -95,6 +95,11 @@
   },
   "contributions": [
     {
+      "target": "zsh-fragments",
+      "name": "brew",
+      "path": "zsh/brew.zsh"
+    },
+    {
       "target": "claude-instructions",
       "path": "claude/CLAUDE.md"
     },
