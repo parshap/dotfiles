@@ -157,6 +157,7 @@ test("real personal and external overlay manifests preserve application state an
   const f = fixture();
   const personal = path.resolve(TEST_DIR, "../../layer");
   const overlay = path.resolve(externalOverlayLayer);
+  const personalManifest = JSON.parse(fs.readFileSync(path.join(personal, "layer.json"), "utf8"));
   const overlayManifest = JSON.parse(fs.readFileSync(path.join(overlay, "layer.json"), "utf8"));
   const personalPatch = JSON.parse(fs.readFileSync(path.join(personal, "pi/settings.patch.json"), "utf8"));
   const overlayPatchContribution = overlayManifest.contributions.find((item) => item.target === "pi-settings");
@@ -172,7 +173,7 @@ test("real personal and external overlay manifests preserve application state an
   const overlayStatuslineContribution = overlayManifest.contributions.find((item) => item.target === "pi-statusline-config");
   const overlayStatuslinePatch = JSON.parse(fs.readFileSync(path.join(overlay, overlayStatuslineContribution.path), "utf8"));
   const expectedStatusline = applyJsonPatch(applyJsonPatch({}, personalStatuslinePatch), overlayStatuslinePatch);
-  const zshContributionCount = overlayManifest.contributions.filter((item) => item.target === "zsh-fragments").length;
+  const zshContributionCount = [...personalManifest.contributions, ...overlayManifest.contributions].filter((item) => item.target === "zsh-fragments").length;
   const piSettings = path.join(f.home, ".pi/agent/settings.json");
   const claudeSettings = path.join(f.home, ".claude/settings.json");
   f.write(piSettings, JSON.stringify({ lastChangelogVersion: "9.9.9", stale: "removed" }));
