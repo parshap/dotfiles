@@ -8,9 +8,9 @@ In git repos, local commits are always ok. Commit work in logical increments whe
 
 Draft pull requests in a PR.md file using GitHub Flavored Markdown (soft line wraps are preserved). PR.md's first line is the title; the body begins after it.
 
-## Editing plans and specs
+## Revising past decisions
 
-When revising a plan or spec, rewrite relevant parts to state only the current decision, as if it had always been the plan. Drop superseded context, comparisons to it, and evidence behind the changes unless it is imperative. If a line only makes sense as a delta from a prior version, it's a vestige, so cut it.
+When making revisions, rewrite relevant parts to state only the current decision, as if it had always been the plan. Drop superseded context, comparisons to it, and evidence behind the changes unless it is imperative. If a line only makes sense as a delta from a prior version, it's a vestige, so cut it.
 
 ## Prefer fresh-context subagents
 
