@@ -12,13 +12,10 @@ Draft pull requests in a PR.md file using GitHub Flavored Markdown (soft line wr
 
 When making revisions, rewrite relevant parts to state only the current decision, as if it had always been the plan. Drop superseded context, comparisons to it, and evidence behind the changes unless it is imperative. If a line only makes sense as a delta from a prior version, it's a vestige, so cut it.
 
-## Prefer fresh-context subagents
+## Using subagents
 
-For implementation, review, testing, validation, and long-running work, use fresh-context subagents with a compact, self-contained contract: the problem, intent, settled decisions, relevant paths, and expected handoff. Fork only when the conversation itself is the review target or contains essential uncaptured context that cannot be summarized safely.
-
-## Multi-model reviews
-
-Use fresh-context subagents with diverse models and review angles. Derive angles from the request; add further angles grounded in what changed. Set each reviewer's model explicitly; otherwise they inherit yours. Synthesize findings yourself.
+Delegating to subagents protects the context window, buys fresh context, and enables model diversity, at the cost of tokens and wall-clock.
+Delegate work that is independently specifiable: a crisp scope, the context needed to act, and an artifact to check when done. Keep work inline when it's small, when it depends on ongoing reasoning, or when the handoff would be most of the work. Choose each subagent's model and effort based on the task's risk and uncertainty. For a broader read, run several subagents with different models.
 
 ## Minimize tool output
 
