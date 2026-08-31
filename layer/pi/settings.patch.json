@@ -12,13 +12,29 @@
       "npm:@vanillagreen/pi-prompt-stash"
     ]
   },
-  { "op": "add", "path": "/defaultThinkingLevel", "value": "high" },
-  { "op": "add", "path": "/treeFilterMode", "value": "no-tools" },
-  { "op": "add", "path": "/theme", "value": "light/dark" },
-  { "op": "add", "path": "/tuiMode", "value": "fullscreen" },
   {
     "op": "add",
-    "path": "/vstack",
+    "path": "/defaultThinkingLevel",
+    "value": "high"
+  },
+  {
+    "op": "add",
+    "path": "/treeFilterMode",
+    "value": "no-tools"
+  },
+  {
+    "op": "add",
+    "path": "/theme",
+    "value": "light/dark"
+  },
+  {
+    "op": "add",
+    "path": "/tuiMode",
+    "value": "fullscreen"
+  },
+  {
+    "op": "add",
+    "path": "/kendex",
     "value": {
       "extensionManager": {
         "config": {
@@ -27,6 +43,13 @@
           }
         }
       }
+    }
+  },
+  {
+    "op": "add",
+    "path": "/subagents",
+    "value": {
+      "disableBuiltins": true
     }
   }
 ]
