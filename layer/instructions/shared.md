@@ -1,12 +1,12 @@
 ## Local by default
 
-NEVER create a pull request, push a branch, or perform other "external world writes" without permission, even in "auto mode".
+NEVER create a pull request, push a branch, or perform other "external world writes" without explicit permission.
 
 ## Commits and pull requests
 
-In git repos, local commits are always ok. Commit work in logical increments when possible.
+Make logical commits as you go.
 
-Draft pull requests in a PR.md file using GitHub Flavored Markdown (soft line wraps are preserved). PR.md's first line is the title; the body begins after it.
+Draft pull requests in ./PR.md (untracked) using GitHub Flavored Markdown (soft line wraps are preserved). The first line is the title, the rest is the body.
 
 ## Revising past decisions
 
