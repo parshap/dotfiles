@@ -18,6 +18,7 @@ The package uses Ajv for manifest structure validation. `fast-json-patch` handle
 - `src/cli.js`: command parsing
 - `src/manifest.js`: schema, path containment, registry loading, and target resolution
 - `src/rfc.js`: JSON Pointer/Patch/Merge Patch boundary
+- `src/markdown.js`: heading-delimited section splitting and composition for `markdown-sections` targets
 - `src/compositor.js`: planning, native projections, atomic publication, locking, and ownership checks
 - `../layer/`: the personal layer (manifest and contributions); deliberately separate from this package directory so the layer root contains only layer data
 

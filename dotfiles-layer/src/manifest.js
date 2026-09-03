@@ -22,7 +22,8 @@ const schema = {
         properties: {
           strategy: { enum: [...SUPPORTED] }, path: { type: "string", minLength: 1 },
           app: { enum: [...NATIVE_APPS] }, base: { enum: ["empty", "live"] },
-          preserve: { type: "array", items: { type: "string" } }, mode: { type: "string", pattern: "^[0-7]{3,4}$" }
+          preserve: { type: "array", items: { type: "string" } }, mode: { type: "string", pattern: "^[0-7]{3,4}$" },
+          level: { type: "integer", minimum: 1, maximum: 6 }
         }
       }
     },
@@ -93,6 +94,7 @@ export function validateManifest(root, registryName) {
       target.base ||= "empty";
       for (const pointer of target.preserve || []) parsePointer(pointer);
     } else if (target.base !== undefined || target.preserve !== undefined) fail(`target ${id} base/preserve require a JSON strategy`);
+    if (target.level !== undefined && target.strategy !== "markdown-sections") fail(`target ${id} level requires the markdown-sections strategy`);
     targets.set(id, target);
   }
   const contributions = (data.contributions ?? []).map((item, index) => ({

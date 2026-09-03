@@ -717,3 +717,74 @@ test("stale drift requires force and target-id renames do not delete the shared 
   assert.equal(state.targets.old, undefined);
   assert.equal(state.targets.renamed.path, target);
 });
+
+test("markdown-sections targets share sections across targets and let higher layers replace one section", () => {
+  const f = fixture();
+  const read = (file) => fs.readFileSync(file, "utf8");
+  const claude = path.join(f.home, "out/CLAUDE.md");
+  const agents = path.join(f.home, "out/AGENTS.md");
+  const low = f.layer("low", {
+    priority: 10,
+    targets: {
+      claude: { strategy: "markdown-sections", path: claude },
+      agents: { strategy: "markdown-sections", path: agents }
+    },
+    contributions: [
+      { target: "claude", path: "shared.md" }, { target: "claude", path: "claude.md" },
+      { target: "agents", path: "shared.md" }, { target: "agents", path: "agents.md" }
+    ]
+  }, {
+    "shared.md": "## Commits\n\nLocal commits are ok.\n\n## Dotfiles ##\n\nUse dotfiles-layer explain.\n",
+    "claude.md": "## Web fetch\n\n```bash\n## not a heading\ncurl example\n```\n",
+    "agents.md": "\n\n## Subagents\n\nDelegate.\n\n### Detail\n\nDeeper headings stay inside.\n\n\n"
+  });
+  const high = f.layer("high", {
+    priority: 20,
+    contributions: [{ target: "claude", path: "override.md" }]
+  }, { "override.md": "Preamble line.\n\n## Commits\n\nNever commit.\n\n## Extra\n\nAppended.\n" });
+  ok(f.run("register", "low", low));
+  ok(f.run("register", "high", high));
+  ok(f.run("apply"));
+  // Replacement keeps the section's original position; new sections append;
+  // the preamble leads; fenced code and deeper headings never split sections.
+  assert.equal(read(claude), [
+    "Preamble line.", "## Commits\n\nNever commit.", "## Dotfiles ##\n\nUse dotfiles-layer explain.",
+    "## Web fetch\n\n```bash\n## not a heading\ncurl example\n```", "## Extra\n\nAppended."
+  ].join("\n\n") + "\n");
+  assert.equal(read(agents), "## Commits\n\nLocal commits are ok.\n\n## Dotfiles ##\n\nUse dotfiles-layer explain.\n\n## Subagents\n\nDelegate.\n\n### Detail\n\nDeeper headings stay inside.\n");
+  const explanation = ok(f.run("explain", "claude")).stdout;
+  assert.match(explanation, /low \(priority 10\) source=.*shared\.md\n    section Commits \(replaced by high\)\n    section Dotfiles\n/);
+  assert.match(explanation, /high \(priority 20\) source=.*override\.md\n    section \(preamble\)\n    section Commits\n    section Extra\n/);
+
+  // Local edits merge line-by-line like other text targets.
+  f.write(agents, `${read(agents)}\n## Local\n\nMine.\n`);
+  assert.match(ok(f.run("status")).stdout, /agents: local overrides/);
+  f.write(path.join(low, "shared.md"), "## Commits\n\nLocal commits are fine.\n\n## Dotfiles ##\n\nUse dotfiles-layer explain.\n");
+  ok(f.run("apply"));
+  assert.match(read(agents), /^## Commits\n\nLocal commits are fine\.\n[^]*## Local\n\nMine\.\n$/);
+
+  // Ambiguous input is rejected before anything is written.
+  f.write(path.join(low, "agents.md"), "## Subagents\n\nA\n\n## Subagents\n\nB\n");
+  notOk(f.run("apply"), /duplicate section heading: Subagents/);
+  f.write(path.join(low, "agents.md"), "##\n\nA\n");
+  notOk(f.run("apply"), /section heading without text/);
+});
+
+test("markdown-sections level selects the heading depth that delimits sections", () => {
+  const f = fixture();
+  const target = path.join(f.home, "out/doc.md");
+  const layerDir = f.layer("layer", {
+    priority: 1,
+    targets: { doc: { strategy: "markdown-sections", path: target, level: 1 } },
+    contributions: [{ target: "doc", path: "base.md" }, { target: "doc", path: "more.md" }]
+  }, {
+    "base.md": "# Top\n\n## Sub\n\nkept inside Top\n\n# Other\n\nx\n",
+    "more.md": "# Top\n\nreplaced whole\n"
+  });
+  ok(f.run("register", "layer", layerDir));
+  ok(f.run("apply"));
+  assert.equal(fs.readFileSync(target, "utf8"), "# Top\n\nreplaced whole\n\n# Other\n\nx\n");
+
+  const bad = f.layer("bad", { priority: 2, targets: { notes: { strategy: "concat", path: path.join(f.home, "out/notes"), level: 2 } } });
+  notOk(f.run("register", "bad", bad), /level requires the markdown-sections strategy/);
+});

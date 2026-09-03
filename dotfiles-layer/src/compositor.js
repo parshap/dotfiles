@@ -5,6 +5,7 @@ import path from "node:path";
 import { spawnSync } from "node:child_process";
 import { LOCK_DIR, REGISTRY, STATE_FILE, STATE_ROOT } from "./config.js";
 import { composeRegistry, loadLayers, validateManifest } from "./manifest.js";
+import { composeMarkdownSections } from "./markdown.js";
 import { applyJsonPatch, maskPointers, mergePatch, preservePointer } from "./rfc.js";
 import { clone, compareText, exists, fail, hash, hasOwn, isObject, jsonEqual, jsonText, readJson, safeName } from "./util.js";
 
@@ -12,7 +13,7 @@ const MISSING = Symbol("missing");
 const isJsonStrategy = (target) => ["json-patch", "json-merge-patch"].includes(target.strategy);
 // Strategies whose drifted live content can be three-way merged against the
 // recorded merge base: JSON documents key-by-key, text files line-by-line.
-const isMergeableStrategy = (target) => isJsonStrategy(target) || ["copy", "concat"].includes(target.strategy);
+const isMergeableStrategy = (target) => isJsonStrategy(target) || ["copy", "concat", "markdown-sections"].includes(target.strategy);
 
 // Three-way merge of JSON documents with git-pull semantics: keys the layers
 // left unchanged keep local edits, keys only the layers changed take the new
@@ -120,6 +121,10 @@ function targetPlan(target) {
   if (target.strategy === "concat") {
     const pieces = target.contributions.map((x) => fs.readFileSync(x.path, "utf8").replace(/\n+$/u, ""));
     const content = Buffer.from(`${pieces.join("\n")}\n`);
+    return { kind: "file", target, content, digest: hash(content) };
+  }
+  if (target.strategy === "markdown-sections") {
+    const { content } = composeMarkdownSections(target);
     return { kind: "file", target, content, digest: hash(content) };
   }
   const live = readLiveJson(target.path);
@@ -538,8 +543,14 @@ export function explain(targetId) {
   if (targetId && !selected[0]) fail(`unknown target: ${targetId}`);
   for (const target of selected) {
     console.log(`${target.id}: ${target.strategy} -> ${target.path}`);
+    const sectionReport = target.strategy === "markdown-sections" && target.contributions.length
+      ? new Map(composeMarkdownSections(target).report.map((entry) => [entry.contribution, entry.sections]))
+      : null;
     for (const contribution of target.contributions) {
       console.log(`  ${contribution.layer} (priority ${contribution.priority})${contribution.name ? ` name=${contribution.name}` : ""} source=${contribution.path}`);
+      for (const section of sectionReport?.get(contribution) ?? []) {
+        console.log(`    section ${section.name}${section.replacedBy ? ` (replaced by ${section.replacedBy})` : ""}`);
+      }
     }
   }
 }

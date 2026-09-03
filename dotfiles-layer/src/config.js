@@ -1,7 +1,7 @@
 import os from "node:os";
 import path from "node:path";
 
-export const SUPPORTED = new Set(["symlink", "copy", "concat", "json-merge-patch", "json-patch", "native-include"]);
+export const SUPPORTED = new Set(["symlink", "copy", "concat", "markdown-sections", "json-merge-patch", "json-patch", "native-include"]);
 export const NATIVE_APPS = new Set(["zsh", "git", "tmux"]);
 export const HOME = process.env.HOME || os.homedir();
 
