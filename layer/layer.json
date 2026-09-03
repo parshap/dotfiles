@@ -4,7 +4,7 @@
   "priority": 10,
   "targets": {
     "pi-agents": {
-      "strategy": "concat",
+      "strategy": "markdown-sections",
       "path": "~/.pi/agent/AGENTS.md",
       "mode": "0644"
     },
@@ -42,7 +42,7 @@
       "path": "~/.pi/agent/tool-manager.json"
     },
     "claude-instructions": {
-      "strategy": "concat",
+      "strategy": "markdown-sections",
       "path": "~/.claude/CLAUDE.md",
       "mode": "0644"
     },
@@ -113,7 +113,15 @@
     },
     {
       "target": "claude-instructions",
+      "path": "instructions/shared.md"
+    },
+    {
+      "target": "claude-instructions",
       "path": "claude/CLAUDE.md"
+    },
+    {
+      "target": "pi-agents",
+      "path": "instructions/shared.md"
     },
     {
       "target": "pi-agents",

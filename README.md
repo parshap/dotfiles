@@ -44,7 +44,7 @@ Update semantics:
 
 Entries under `files/` are symlinked, so editing a live file edits this repo's working tree: `git -C ~/dotfiles diff` shows the change and committing publishes it. Host tools writing through those symlinks (for example into `~/.gitconfig`) appear the same way, and the daily update notice reports the uncommitted-file count so those edits stay visible.
 
-Composed targets (Pi/Claude settings, zsh/Git/tmux loaders) are generated output; editing them directly creates *local overrides*. JSON targets (`json-patch`/`json-merge-patch`) merge overrides the way `git pull` merges a dirty file — key by key — and text targets (`copy`, `concat`) do the same line by line via `git merge-file`: content the layers did not change keeps its local edits, content only the layers changed takes the new value, and overlapping changes on both sides fail the apply with the conflict named. Local overrides are expected state — `status` reports them as `local overrides` without failing — while `symlink` and `native-include` targets are structurally layer-owned and still refuse drift (editing through their links edits the layer repos directly). To inspect and adopt a live change:
+Composed targets (Pi/Claude settings, zsh/Git/tmux loaders) are generated output; editing them directly creates *local overrides*. JSON targets (`json-patch`/`json-merge-patch`) merge overrides the way `git pull` merges a dirty file — key by key — and text targets (`copy`, `concat`, `markdown-sections`) do the same line by line via `git merge-file`: content the layers did not change keeps its local edits, content only the layers changed takes the new value, and overlapping changes on both sides fail the apply with the conflict named. Local overrides are expected state — `status` reports them as `local overrides` without failing — while `symlink` and `native-include` targets are structurally layer-owned and still refuse drift (editing through their links edits the layer repos directly). To inspect and adopt a live change:
 
 ```sh
 dotfiles-layer status         # which targets differ, and how
@@ -68,11 +68,16 @@ Strategies:
 
 - `symlink` and `copy`: one contribution from the highest-priority layer
 - `concat`: deterministic newline-normalized concatenation
+- `markdown-sections`: Markdown composed section by section; a section's heading text is its key
 - `json-merge-patch`: RFC 7396
 - `json-patch`: RFC 6902 and RFC 6901 pointers, including arrays and root operations
 - `native-include`: named zsh, Git, or tmux fragments projected into native loaders
 
 Templates and custom commands are intentionally unsupported. Package/library details are in [`dotfiles-layer/README.md`](dotfiles-layer/README.md).
+
+### `markdown-sections`
+
+Contributions are Markdown files split at ATX headings of the target's `level` (default 2, so `##`) or shallower; deeper headings, fenced code blocks, and text before the first heading (the preamble) stay inside the section they follow. Sections are keyed by exact heading text (closing `#`s dropped). Contributions apply in layer order: a section whose key was already seen replaces the earlier one in place, any other section is appended, and the preamble always leads. Contribute the same source file to several targets to share sections between them, and contribute a file holding only the sections to override from a higher-priority layer to replace just those. Duplicate headings within one contribution and headings without text are rejected. `dotfiles-layer explain TARGET` lists each contribution's sections and which layer replaced them.
 
 ### CLI
 
@@ -96,7 +101,7 @@ Deleting `managed.json` intentionally forgets all ownership. Missing targets may
 
 ## Application hooks
 
-- Pi settings, keybindings, MCP client visibility, tool-manager preferences, global instructions, refresh/statusline/skill-projection extension code, and shared statusline libraries are managed by the personal layer. Generated JSON entry points such as `settings.json`, `mcp.json`, and `statusline.json` start with a `$comment` naming the target and `dotfiles-layer explain` command that locates extension sources. Single-owner files such as `keybindings.json` are symlinked directly to their repository source. The public statusline reads optional composed promotion rules from `~/.pi/agent/statusline.json`; the public base is empty, while private layers can promote their own extension statuses without forking the statusline. A private layer may add provider/MCP server preferences, skill-projection data, and autocomplete packages/config. Credentials, trust decisions, sessions, generated model catalogs, package caches, marketplace state, sandbox runtime/security decisions, and histories remain intentionally app/machine-owned.
+- Pi settings, keybindings, MCP client visibility, tool-manager preferences, global instructions, refresh/statusline/skill-projection extension code, and shared statusline libraries are managed by the personal layer. Generated JSON entry points such as `settings.json`, `mcp.json`, and `statusline.json` start with a `$comment` naming the target and `dotfiles-layer explain` command that locates extension sources. Single-owner files such as `keybindings.json` are symlinked directly to their repository source. The Pi `AGENTS.md` and Claude `CLAUDE.md` instruction files are `markdown-sections` targets: `layer/instructions/shared.md` contributes the sections common to both, `layer/pi/AGENTS.md` and `layer/claude/CLAUDE.md` add app-specific ones, and another layer can replace any single section by contributing a file with the same heading. The public statusline reads optional composed promotion rules from `~/.pi/agent/statusline.json`; the public base is empty, while private layers can promote their own extension statuses without forking the statusline. A private layer may add provider/MCP server preferences, skill-projection data, and autocomplete packages/config. Credentials, trust decisions, sessions, generated model catalogs, package caches, marketplace state, sandbox runtime/security decisions, and histories remain intentionally app/machine-owned.
 - zsh sources ordered fragments from the generated zsh projection.
 - `files/.gitconfig` is the public, tracked root Git config and ends with a generic include of the generated Git loader. Host tooling changes therefore visibly dirty this checkout. A private layer may conditionally include its identity for repositories under a work root or with a work Git remote.
 - tmux sources the generated tmux loader.
