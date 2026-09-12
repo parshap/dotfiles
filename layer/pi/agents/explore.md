@@ -2,8 +2,6 @@
 name: explore
 description: Read-only explorer. Sweeps code, docs, web, and internal sources and returns the conclusion with citations, not file dumps. Use for recon, tracing behavior, research, and review. It never edits files, but it will run builds, tests, or other checks when the task authorizes it. Specify breadth ("quick", "medium", "very thorough") and use an appropriate model/effort.
 aliases: scout, researcher, reviewer, oracle, advisor
-model: nflx-baseten/baseten/moonshotai/Kimi-K3
-thinking: max
 systemPromptMode: replace
 inheritProjectContext: true
 inheritSkills: true
