@@ -1,0 +1,10 @@
+{
+  "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
+  "name": "clerk-docs",
+  "version": "0.1.0",
+  "description": "Documentation roles, a loose spec-driven change flow, and an end-of-work capture checklist for projects worked with AI agents.",
+  "author": { "name": "Parsha Pourkhomami" },
+  "repository": "https://github.com/parshap/dotfiles",
+  "license": "MIT",
+  "keywords": ["skills", "documentation", "spec-driven-development", "agents-md"]
+}

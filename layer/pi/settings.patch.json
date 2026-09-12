@@ -10,7 +10,8 @@
     "value": [
       "npm:pi-subagents",
       "npm:@vanillagreen/pi-prompt-stash",
-      "git:github.com/DietrichGebert/ponytail"
+      "git:github.com/DietrichGebert/ponytail",
+      "./plugins/clerk-docs"
     ]
   },
   {

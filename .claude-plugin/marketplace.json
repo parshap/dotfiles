@@ -1,0 +1,14 @@
+{
+  "name": "dotfiles",
+  "owner": {
+    "name": "Parsha Pourkhomami"
+  },
+  "description": "Agent plugins maintained in the parshap/dotfiles repository.",
+  "plugins": [
+    {
+      "name": "clerk-docs",
+      "source": "./agent-plugins/clerk-docs",
+      "description": "Documentation roles, a loose spec-driven change flow, and an end-of-work capture checklist for projects worked with AI agents."
+    }
+  ]
+}
