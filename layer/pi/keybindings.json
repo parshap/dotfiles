@@ -2,5 +2,6 @@
   "app.model.select": ["alt+m", "ctrl+shift+l"],
   "app.tree.filter.labeledOnly": "alt+l",
   "app.session.toggleSort": "alt+s",
-  "app.models.save": "ctrl+shift+s"
+  "app.models.save": "ctrl+shift+s",
+  "app.thinking.save": []
 }
