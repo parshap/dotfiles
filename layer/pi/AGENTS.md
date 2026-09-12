@@ -3,6 +3,25 @@
 Delegating to subagents protects the context window, buys fresh context, and enables model diversity, at the cost of tokens and wall-clock.
 Delegate work that is independently specifiable: a crisp scope, the context needed to act, and an artifact to check when done. Keep work inline when it's small, when it depends on ongoing reasoning, or when the handoff would be most of the work. Choose each subagent's model and effort based on the task's risk and uncertainty. For a broader read, run several subagents with different models.
 
+## Subagent models
+
+When using subagents, pick the model and effort based on the task.
+
+Preferred strong model:
+`anthropic/claude-opus-5:high`
+
+Alternative strong models:
+`anthropic/claude-fable-5-1:high`
+
+Multi-step guided work:
+`anthropic/claude-opus-5:medium`
+
+Bounded, verifiable, single-step tasks:
+`anthropic/claude-sonnet-5:medium`
+
+Fast simple scouting, triage, and lookup:
+`anthropic/claude-haiku-4.5:medium`
+
 ## Response style
 
 Keep your responses short and direct while doing the work just as thoroughly. The user chose brevity over narration. You should:
