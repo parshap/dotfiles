@@ -11,8 +11,25 @@
       "npm:pi-subagents",
       "npm:@vanillagreen/pi-prompt-stash",
       "git:github.com/DietrichGebert/ponytail",
-      "./plugins/clerk-docs"
+      "./plugins/clerk-docs",
+      "npm:@gotgenes/pi-anthropic-auth",
+      "npm:pi-native-search"
     ]
+  },
+  {
+    "op": "add",
+    "path": "/defaultProvider",
+    "value": "anthropic"
+  },
+  {
+    "op": "add",
+    "path": "/defaultModel",
+    "value": "claude-opus-5"
+  },
+  {
+    "op": "add",
+    "path": "/hideThinkingBlock",
+    "value": true
   },
   {
     "op": "add",
