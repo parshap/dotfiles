@@ -11,13 +11,13 @@ Preferred strong model:
 `anthropic/claude-opus-5:high`
 
 Alternative strong models:
-`anthropic/claude-fable-5-1:high`
+`anthropic/claude-fable-5-1:high`, `openai-codex/gpt-5.6-sol:high`
 
 Multi-step guided work:
-`anthropic/claude-opus-5:medium`
+`openai-codex/gpt-5.6-terra:medium`
 
 Bounded, verifiable, single-step tasks:
-`anthropic/claude-sonnet-5:medium`
+`openai-codex/gpt-5.6-luna:low`
 
 Fast simple scouting, triage, and lookup:
 `anthropic/claude-haiku-4.5:medium`
