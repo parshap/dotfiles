@@ -34,7 +34,9 @@ import { compileStatusPromotions, selectPromotedStatus, stripAnsi } from "../lib
  * publisher's source), far more stable than display text; if a publisher
  * renames its key, the status simply reappears.
  */
-const HIDE_STATUS_KEYS = new Set<string>();
+const HIDE_STATUS_KEYS = new Set<string>([
+	"search", // pi-native-search backend label, e.g. "search[search:native:mcp,fetch]"
+]);
 
 /**
  * Known-boring steady states per key, matched against ANSI-stripped text.
