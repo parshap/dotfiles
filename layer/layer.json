@@ -118,6 +118,16 @@
       "path": "zsh/brew.zsh"
     },
     {
+      "target": "zsh-fragments",
+      "name": "rust",
+      "path": "zsh/rust.zsh"
+    },
+    {
+      "target": "zsh-fragments",
+      "name": "mise",
+      "path": "zsh/mise.zsh"
+    },
+    {
       "target": "claude-instructions",
       "path": "instructions/shared.md"
     },
