@@ -15,7 +15,8 @@
       "npm:@gotgenes/pi-anthropic-auth",
       "npm:pi-native-search",
       "npm:@pi-plugins/usage",
-      "npm:@narumitw/pi-codex-compact@0.53.1"
+      "npm:@narumitw/pi-codex-compact@0.53.1",
+      "npm:pi-context-view"
     ]
   },
   {
