@@ -13,7 +13,8 @@
       "git:github.com/DietrichGebert/ponytail",
       "./plugins/clerk-docs",
       "npm:@gotgenes/pi-anthropic-auth",
-      "npm:pi-native-search"
+      "npm:pi-native-search",
+      "npm:@pi-plugins/usage"
     ]
   },
   {

@@ -37,6 +37,12 @@
       "base": "empty",
       "mode": "0600"
     },
+    "pi-usage-config": {
+      "strategy": "json-patch",
+      "path": "~/.pi/agent/extensions/usage.json",
+      "base": "empty",
+      "mode": "0600"
+    },
     "pi-tool-manager": {
       "strategy": "symlink",
       "path": "~/.pi/agent/tool-manager.json"
@@ -166,6 +172,10 @@
     {
       "target": "pi-statusline-config",
       "path": "pi/statusline.patch.json"
+    },
+    {
+      "target": "pi-usage-config",
+      "path": "pi/usage.patch.json"
     },
     {
       "target": "pi-tool-manager",
