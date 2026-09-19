@@ -14,7 +14,8 @@
       "./plugins/clerk-docs",
       "npm:@gotgenes/pi-anthropic-auth",
       "npm:pi-native-search",
-      "npm:@pi-plugins/usage"
+      "npm:@pi-plugins/usage",
+      "npm:@narumitw/pi-codex-compact@0.53.1"
     ]
   },
   {

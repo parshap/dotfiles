@@ -1,0 +1,17 @@
+[
+  {
+    "op": "add",
+    "path": "/enabled",
+    "value": true
+  },
+  {
+    "op": "add",
+    "path": "/protocol",
+    "value": "remote-v2"
+  },
+  {
+    "op": "add",
+    "path": "/notifyOnFallback",
+    "value": true
+  }
+]

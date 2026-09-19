@@ -43,6 +43,12 @@
       "base": "empty",
       "mode": "0600"
     },
+    "pi-codex-compact-config": {
+      "strategy": "json-patch",
+      "path": "~/.pi/agent/pi-codex-compact.json",
+      "base": "empty",
+      "mode": "0600"
+    },
     "pi-tool-manager": {
       "strategy": "symlink",
       "path": "~/.pi/agent/tool-manager.json"
@@ -176,6 +182,10 @@
     {
       "target": "pi-usage-config",
       "path": "pi/usage.patch.json"
+    },
+    {
+      "target": "pi-codex-compact-config",
+      "path": "pi/codex-compact.patch.json"
     },
     {
       "target": "pi-tool-manager",
