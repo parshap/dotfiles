@@ -84,6 +84,46 @@
       "strategy": "symlink",
       "path": "~/.pi/agent/extensions/statusline.ts"
     },
+    "pi-permission-system-config": {
+      "strategy": "symlink",
+      "path": "~/.pi/agent/extensions/pi-permission-system/config.json"
+    },
+    "pi-extension-permission-reviewer-index-ts": {
+      "strategy": "symlink",
+      "path": "~/.pi/agent/extensions/permission-reviewer/index.ts"
+    },
+    "pi-extension-permission-reviewer-config-ts": {
+      "strategy": "symlink",
+      "path": "~/.pi/agent/extensions/permission-reviewer/config.ts"
+    },
+    "pi-extension-permission-reviewer-context-ts": {
+      "strategy": "symlink",
+      "path": "~/.pi/agent/extensions/permission-reviewer/context.ts"
+    },
+    "pi-extension-permission-reviewer-evidence-ts": {
+      "strategy": "symlink",
+      "path": "~/.pi/agent/extensions/permission-reviewer/evidence.ts"
+    },
+    "pi-extension-permission-reviewer-policy-ts": {
+      "strategy": "symlink",
+      "path": "~/.pi/agent/extensions/permission-reviewer/policy.ts"
+    },
+    "pi-extension-permission-reviewer-prompt-ts": {
+      "strategy": "symlink",
+      "path": "~/.pi/agent/extensions/permission-reviewer/prompt.ts"
+    },
+    "pi-extension-permission-reviewer-review-ts": {
+      "strategy": "symlink",
+      "path": "~/.pi/agent/extensions/permission-reviewer/review.ts"
+    },
+    "pi-extension-permission-reviewer-config-json": {
+      "strategy": "symlink",
+      "path": "~/.pi/agent/extensions/permission-reviewer/config.json"
+    },
+    "pi-extension-permission-reviewer-readme-md": {
+      "strategy": "symlink",
+      "path": "~/.pi/agent/extensions/permission-reviewer/README.md"
+    },
     "pi-extension-skill-projection-index": {
       "strategy": "symlink",
       "path": "~/.pi/agent/extensions/skill-projection/index.ts"
@@ -214,6 +254,46 @@
     {
       "target": "pi-extension-statusline",
       "path": "pi/extensions/statusline.ts"
+    },
+    {
+      "target": "pi-permission-system-config",
+      "path": "pi/extensions/pi-permission-system-config.json"
+    },
+    {
+      "target": "pi-extension-permission-reviewer-index-ts",
+      "path": "pi/extensions/permission-reviewer/index.ts"
+    },
+    {
+      "target": "pi-extension-permission-reviewer-config-ts",
+      "path": "pi/extensions/permission-reviewer/config.ts"
+    },
+    {
+      "target": "pi-extension-permission-reviewer-context-ts",
+      "path": "pi/extensions/permission-reviewer/context.ts"
+    },
+    {
+      "target": "pi-extension-permission-reviewer-evidence-ts",
+      "path": "pi/extensions/permission-reviewer/evidence.ts"
+    },
+    {
+      "target": "pi-extension-permission-reviewer-policy-ts",
+      "path": "pi/extensions/permission-reviewer/policy.ts"
+    },
+    {
+      "target": "pi-extension-permission-reviewer-prompt-ts",
+      "path": "pi/extensions/permission-reviewer/prompt.ts"
+    },
+    {
+      "target": "pi-extension-permission-reviewer-review-ts",
+      "path": "pi/extensions/permission-reviewer/review.ts"
+    },
+    {
+      "target": "pi-extension-permission-reviewer-config-json",
+      "path": "pi/extensions/permission-reviewer/config.json"
+    },
+    {
+      "target": "pi-extension-permission-reviewer-readme-md",
+      "path": "pi/extensions/permission-reviewer/README.md"
     },
     {
       "target": "pi-extension-skill-projection-index",
