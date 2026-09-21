@@ -7,20 +7,22 @@ Delegate work that is independently specifiable: a crisp scope, the context need
 
 When using subagents, pick the model and effort based on the task.
 
-Preferred strong model:
-`anthropic/claude-opus-5:high`
-
-Alternative strong models:
-`anthropic/claude-fable-5-1:high`, `openai-codex/gpt-5.6-sol:high`
+Preferred strong models:
+`anthropic/claude-opus-5:high`, `openai-codex/gpt-5.6-sol:high`
 
 Multi-step guided work:
-`openai-codex/gpt-5.6-terra:medium`
+`openai-codex/gpt-5.6-luna:max`
 
 Bounded, verifiable, single-step tasks:
 `openai-codex/gpt-5.6-luna:low`
 
 Fast simple scouting, triage, and lookup:
 `anthropic/claude-haiku-4.5:medium`
+
+Most advanced (and costly), only use with explicit permission:
+`anthropic/claude-fable-5-1:high`, `openai-codex/gpt-6-astra:medium`
+
+You can adjust effort level based on the task.
 
 ## Response style
 
