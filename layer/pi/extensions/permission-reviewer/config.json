@@ -1,0 +1,6 @@
+{
+  "$comment": "permission-reviewer config. Every key is optional; see README.md and DEFAULT_CONFIG in config.ts for the rest.",
+  "model": "openai-codex/codex-auto-review",
+  "reasoning": "low",
+  "timeoutMs": 60000
+}

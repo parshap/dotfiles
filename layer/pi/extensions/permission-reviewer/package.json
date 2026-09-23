@@ -1,0 +1,8 @@
+{
+  "name": "permission-reviewer",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node --test test/"
+  }
+}
