@@ -68,6 +68,10 @@
       "strategy": "symlink",
       "path": "~/.pi/agent/extensions/refresh-screen.ts"
     },
+    "pi-extension-subagent-foreground-guard": {
+      "strategy": "symlink",
+      "path": "~/.pi/agent/extensions/subagent-foreground-guard.ts"
+    },
     "pi-extension-subagent-zone-profile": {
       "strategy": "symlink",
       "path": "~/.pi/agent/extensions/subagent-zone-profile.ts"
@@ -238,6 +242,10 @@
     {
       "target": "pi-extension-refresh-screen",
       "path": "pi/extensions/refresh-screen.ts"
+    },
+    {
+      "target": "pi-extension-subagent-foreground-guard",
+      "path": "pi/extensions/subagent-foreground-guard.ts"
     },
     {
       "target": "pi-extension-subagent-zone-profile",
