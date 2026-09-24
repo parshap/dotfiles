@@ -9,7 +9,8 @@
     "path": "/packages",
     "value": [
       "npm:pi-subagents",
-      "npm:@vanillagreen/pi-prompt-stash"
+      "npm:@vanillagreen/pi-prompt-stash",
+      "git:github.com/DietrichGebert/ponytail"
     ]
   },
   {

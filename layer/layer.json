@@ -92,6 +92,12 @@
       "strategy": "symlink",
       "path": "~/.pi/agent/lib/statusline-claude.mjs"
     },
+    "ponytail-config": {
+      "strategy": "json-patch",
+      "path": "~/.config/ponytail/config.json",
+      "base": "empty",
+      "mode": "0600"
+    },
     "zsh-fragments": {
       "strategy": "native-include",
       "app": "zsh"
@@ -142,6 +148,10 @@
     {
       "target": "pi-settings",
       "path": "pi/settings.patch.json"
+    },
+    {
+      "target": "ponytail-config",
+      "path": "ponytail/config.patch.json"
     },
     {
       "target": "pi-statusline-config",
