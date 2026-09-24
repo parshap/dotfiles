@@ -322,8 +322,14 @@ test("protects unmanaged files and supports matching adoption and explicit force
   const layer = f.layer("only", { priority: 1, targets: { copy: { strategy: "copy", path: desired } }, contributions: [{ target: "copy", path: "source" }] }, { source: "same\n" });
   ok(f.run("register", "only", layer));
   f.write(desired, "same\n");
-  notOk(f.run("apply"), /unmanaged.*--adopt/);
+  fs.chmodSync(desired, 0o644);
+  notOk(f.run("apply"), /unmanaged; record ownership.*--adopt/);
+  // Identical content is adoptable whatever mode the umask gave it.
+  fs.chmodSync(desired, 0o664);
+  notOk(f.run("apply"), /unmanaged \(only its mode differs\).*--adopt/);
   ok(f.run("apply", "--adopt"));
+  assert.equal(fs.statSync(desired).mode & 0o777, 0o644);
+  assert.equal(fs.existsSync(path.join(f.state, "dotfiles-layer/backups")), false);
   // Drift on a mergeable target rides along instead of refusing; force still discards it.
   f.write(desired, "local edit\n");
   ok(f.run("apply"));

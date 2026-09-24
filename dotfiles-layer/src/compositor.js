@@ -413,7 +413,11 @@ export function apply(targetId, options) {
         if (!status.managed && !options.adopt && !options.force) fail(`${plan.target.id}: desired target already exists but is unmanaged; record ownership with: dotfiles-layer apply ${plan.target.id} --adopt`);
         continue;
       }
-      if (status.actual !== null && !status.managed && !options.force) fail(`${plan.target.id}: refusing to replace unmanaged target ${plan.target.path}; inspect with: dotfiles-layer diff ${plan.target.id}; then replace with: dotfiles-layer apply ${plan.target.id} --force (the existing content is backed up first)`);
+      // Identical content with a different mode (e.g. 0664 under a 002 umask)
+      // is adoptable; adopting applies the target's mode.
+      const modeOnly = status.actual === plan.digest;
+      if (modeOnly && !status.managed && !options.adopt && !options.force) fail(`${plan.target.id}: desired target already exists but is unmanaged (only its mode differs); record ownership and apply mode ${modeFor(plan).toString(8)} with: dotfiles-layer apply ${plan.target.id} --adopt`);
+      if (status.actual !== null && !modeOnly && !status.managed && !options.force) fail(`${plan.target.id}: refusing to replace unmanaged target ${plan.target.path}; inspect with: dotfiles-layer diff ${plan.target.id}; then replace with: dotfiles-layer apply ${plan.target.id} --force (the existing content is backed up first)`);
       const acceptsLiveBase = ["json-patch", "json-merge-patch"].includes(plan.target.strategy)
         && plan.target.base === "live";
       const onlyPreservedFieldsChanged = Boolean(
@@ -468,7 +472,7 @@ export function apply(targetId, options) {
         } else {
           // Managed content matching its recorded digest is reproducible from
           // the layers; anything else being displaced is preserved first.
-          const reproducible = status.managed && status.record.digest === status.actual;
+          const reproducible = (status.managed && status.record.digest === status.actual) || status.actual === plan.digest;
           if (status.actual !== null && !reproducible) backupExisting(plan.target.path);
           if (plan.kind === "file") atomicFile(plan.target.path, plan.content, modeFor(plan));
           else if (plan.kind === "symlink") atomicSymlink(plan.target.path, plan.source);
