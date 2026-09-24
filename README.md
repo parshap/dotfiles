@@ -62,11 +62,17 @@ Anything a force path displaces — a static file replaced by `--force-links`, a
 
 Active layer roots are registry symlinks under `${XDG_CONFIG_HOME:-~/.config}/dotfiles-layer/layers.d`. Only absolute XDG paths are honored; relative values fall back under `$HOME`. Generated projections, the ownership ledger, and the global lock live under `${XDG_STATE_HOME:-~/.local/state}/dotfiles-layer`.
 
-A `layer.json` declares a name, integer priority, target definitions, and ordered contributions. Layers sort by priority then name; order within a layer is preserved. Source files must resolve inside their layer root. Duplicate/unknown targets, target collisions, path traversal, ambiguous winners, and duplicate native fragment names are rejected.
+A `layer.json` declares a name, integer priority, target definitions, ordered contributions, and optional [features](#features). Layers sort by priority then name; order within a layer is preserved. Sources must resolve inside their layer root. Duplicate/unknown targets, target collisions, path traversal, ambiguous winners, and duplicate native fragment names are rejected.
+
+When a target leaves the composed set (removed from its layer or disabled), the next full `apply` prunes its output after publishing every current target. Pruning also removes the directories it empties, up to `$HOME`, including directories the compositor did not create (disabling the only extension under `~/.pi/agent/extensions` removes that directory too); it stops at any directory reached through a symlink.
+
+A target may take over a path that stale targets occupy: a directory symlink replacing per-file targets inside that directory, or the reverse. Those overlapping stale outputs are pruned before publishing, so an apply that fails afterward leaves them removed until the next successful apply. The replaced directory must hold nothing but those outputs, and `apply TARGET` refuses the overlap and asks for a full `apply`.
+
+The ledger records where each output's parent directory really is. If an ancestor is later replaced, for example by a symlink to another location, `apply` refuses to prune or overwrite through it; `--force` then replaces a current target (backing up what is there) or drops a stale record without deleting anything. Nothing is ever written through a symlinked ancestor into a layer source, and one target may not lie inside another.
 
 Strategies:
 
-- `symlink` and `copy`: one contribution from the highest-priority layer
+- `symlink` and `copy`: one contribution from the highest-priority layer; a `symlink` source may be a directory
 - `concat`: deterministic newline-normalized concatenation
 - `markdown-sections`: Markdown composed section by section; a section's heading text is its key
 - `json-merge-patch`: RFC 7396
@@ -74,6 +80,26 @@ Strategies:
 - `native-include`: named zsh, Git, or tmux fragments projected into native loaders
 
 Templates and custom commands are intentionally unsupported. Package/library details are in [`dotfiles-layer/README.md`](dotfiles-layer/README.md).
+
+### Features
+
+A feature is a named capability: the targets it owns plus its contributions to any target, including targets defined elsewhere.
+
+```json
+"features": {
+  "pi-permissions": {
+    "targets": { "pi-permission-reviewer": { "strategy": "symlink", "path": "~/.pi/agent/extensions/permission-reviewer" } },
+    "contributions": [
+      { "target": "pi-permission-reviewer", "path": "pi/permissions/permission-reviewer" },
+      { "target": "pi-settings", "path": "pi/permissions/settings.patch.json" }
+    ]
+  }
+}
+```
+
+Feature contributions follow the layer's top-level contributions, in declaration order. Contributions to shared targets should be self-contained, such as a JSON Patch `add` to `/packages/-`, so dropping them leaves the rest intact.
+
+A higher-priority layer turns features off with `"disable": ["pi-permissions"]`. The feature's targets leave the composed set, so their output is pruned and their paths are free for the disabling layer to define. Its contributions to other targets are dropped. Feature names are global. Disabling an unknown feature, disabling from an equal- or lower-priority layer, and contributing to a disabled feature's target are rejected, so renaming a feature cannot silently re-enable it elsewhere. `dotfiles-layer explain` shows each target's feature and whether each feature is enabled.
 
 ### `markdown-sections`
 
@@ -91,7 +117,7 @@ dotfiles-layer status [TARGET]  # 'check' remains an alias
 dotfiles-layer apply [TARGET] [--adopt] [--force]
 ```
 
-Register always revalidates the manifest. Registering a name already resolving to the same canonical root is a true filesystem no-op; the same name at a different root is atomically retargeted. `status` and `diff` exit nonzero on actionable differences (clean local overrides do not count). `--adopt` records an identical unmanaged target; `--force` replaces an unmanaged or unexpectedly modified target, backing up the displaced content first (see "Force and backups"). Writes and native directory publication are staged/atomic, permission controlled, and protected by one state-root lock. No-op apply preserves target and ledger mtimes.
+Register always revalidates the manifest. Registering a name already resolving to the same canonical root is a true filesystem no-op; the same name at a different root is atomically retargeted. `status` and `diff` exit nonzero on actionable differences (clean local overrides do not count). `--adopt` records an identical unmanaged target; `--force` replaces an unmanaged or unexpectedly modified target, backing up the displaced content first (see "Force and backups"). Each write and native directory publication is staged/atomic, permission controlled, and protected by one state-root lock; an apply as a whole is not transactional. No-op apply preserves target and ledger mtimes.
 
 ### `managed.json` ownership semantics
 

@@ -3,8 +3,8 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { spawnSync } from "node:child_process";
-import { LOCK_DIR, REGISTRY, STATE_FILE, STATE_ROOT } from "./config.js";
-import { composeRegistry, loadLayers, validateManifest } from "./manifest.js";
+import { HOME, LOCK_DIR, REGISTRY, STATE_FILE, STATE_ROOT } from "./config.js";
+import { composeRegistry, loadLayers, resolveFeatures, validateManifest } from "./manifest.js";
 import { composeMarkdownSections } from "./markdown.js";
 import { applyJsonPatch, maskPointers, mergePatch, preservePointer } from "./rfc.js";
 import { clone, compareText, exists, fail, hash, hasOwn, isObject, jsonEqual, jsonText, readJson, safeName } from "./util.js";
@@ -215,6 +215,67 @@ function removeRecordedTarget(record) {
   fs.rmSync(record.path);
 }
 
+const within = (child, parent) => child.startsWith(`${parent}${path.sep}`);
+const insideAny = (p, roots) => roots.some((root) => p === root || within(p, root));
+
+// Where a path's parent directory really is: the nearest existing ancestor
+// resolved through symlinks, plus the missing components. Recorded at
+// publication so a later prune or write can detect that an ancestor was
+// replaced (for example by a symlink to somewhere else) and refuse to act on
+// content it cannot prove it owns. null when an ancestor cannot be resolved.
+function realParent(p) {
+  let dir = path.dirname(p);
+  const missing = [];
+  while (!exists(dir)) { missing.unshift(path.basename(dir)); dir = path.dirname(dir); }
+  try { return path.join(fs.realpathSync(dir), ...missing); } catch { return null; }
+}
+
+// Pruning a target must not leave the directories that held it behind (an
+// empty extension directory is still discovered by its app). Climb only while
+// the directory is empty, inside HOME, and not reached through a symlink.
+function removeEmptyParents(dir) {
+  const realHome = fs.realpathSync(HOME);
+  while (within(dir, HOME)) {
+    try {
+      if (fs.realpathSync(dir) !== path.join(realHome, path.relative(HOME, dir))) return;
+      fs.rmdirSync(dir);
+    } catch { return; }
+    dir = path.dirname(dir);
+  }
+}
+
+function staleRecords(state, targets) {
+  return Object.entries(state.targets).filter(([id]) => !targets.has(id));
+}
+
+// A stale record's output is deleted on prune unless another target now owns
+// its path or it is already gone.
+const deletes = (record, desiredPaths) => !desiredPaths.has(record.path) && exists(record.path);
+
+// Stale records whose output overlaps a target's path: a directory symlink
+// the target lies beneath, or files inside the directory the target replaces.
+// They must be pruned before the target is published.
+const blockersOf = (p, staleDeleting) => staleDeleting.filter(([, record]) => within(p, record.path) || within(record.path, p));
+
+// A real directory whose every leaf is a stale output about to be deleted
+// disappears once they are pruned, so a new target may take its place.
+// Empty directories and anything untracked keep it in place.
+function clearedByPrune(p, deletingPaths) {
+  if (!exists(p) || !fs.lstatSync(p).isDirectory()) return false;
+  const walk = (dir) => {
+    const names = fs.readdirSync(dir);
+    return names.length > 0 && names.every((name) => {
+      const entry = path.join(dir, name);
+      return deletingPaths.has(entry) || (fs.lstatSync(entry).isDirectory() && walk(entry));
+    });
+  };
+  return walk(p);
+}
+
+// Whether a target overlapping stale outputs will be free once they are pruned.
+const freedByPrune = (p, blockers, deletingPaths) =>
+  blockers.some(([, record]) => within(p, record.path)) || clearedByPrune(p, deletingPaths);
+
 function statusFor(plan, state) {
   const actual = actualDigest(plan);
   const record = state.targets[plan.target.id]
@@ -228,6 +289,8 @@ function statusFor(plan, state) {
       actualControlledDigest = "invalid";
     }
   }
+  const parent = realParent(plan.target.path);
+  const parentMoved = Boolean(record?.parent && actual !== null && parent !== record.parent);
   const modeCurrent = plan.kind !== "file" || actual === null || actual === "wrong-kind" || (fs.lstatSync(plan.target.path).mode & 0o777) === modeFor(plan);
   let merge;
   if (plan.kind === "file" && isMergeableStrategy(plan.target) && record && actual !== null && actual !== "wrong-kind" && actual !== plan.digest) {
@@ -238,6 +301,8 @@ function statusFor(plan, state) {
     actualControlledDigest,
     record,
     merge,
+    parent,
+    parentMoved,
     current: actual === plan.digest && modeCurrent,
     managed: Boolean(record && record.path === plan.target.path),
   };
@@ -399,16 +464,46 @@ function withLock(callback) {
 export function apply(targetId, options) {
   return withLock(() => {
     // Build every selected result before publishing any of them.
-    const { targets, plans } = makePlans(targetId);
+    const { layers, targets, plans } = makePlans(targetId);
+    const layerRoots = layers.map((layer) => layer.root);
     const state = readState();
     const originalState = jsonText(state);
     const desiredPaths = new Set([...targets.values()].map((target) => target.path));
-    const stale = targetId
-      ? []
-      : Object.entries(state.targets).filter(([id]) => !targets.has(id));
+    const stale = staleRecords(state, targets);
+    const staleDeleting = stale.filter(([, record]) => deletes(record, desiredPaths));
+    const deletingPaths = new Set(staleDeleting.map(([, record]) => record.path));
 
+    // Preflight every stale record (full apply only) before changing anything.
+    const stalePlans = (targetId ? [] : stale).map(([id, record]) => {
+      const superseded = desiredPaths.has(record.path);
+      const actual = superseded ? record.digest : actualDigestForRecord(record);
+      let forget = false;
+      if (!superseded && actual !== null) {
+        const parent = realParent(record.path);
+        const moved = record.parent ? parent !== record.parent : parent === null || insideAny(parent, layerRoots);
+        if (moved) {
+          if (!options.force) fail(`${id}: the parent directory of stale target ${record.path} now resolves to ${parent ?? "an unresolvable path"}${record.parent ? ` (recorded ${record.parent})` : " inside a layer source"}, so it is not provably managed output; inspect it, then drop the record without deleting anything with: dotfiles-layer apply --force`);
+          forget = true;
+        } else if (actual !== record.digest && !options.force) {
+          fail(`${id}: stale managed target ${record.path} was modified outside the compositor; inspect the file, then prune with: dotfiles-layer apply --force (the modified content is backed up first)`);
+        }
+      }
+      return { id, record, actual, superseded, forget };
+    });
+
+    const blockerIds = new Set();
     for (const plan of plans) {
+      const blockers = blockersOf(plan.target.path, staleDeleting);
+      if (blockers.length) {
+        const names = blockers.map(([id]) => id).join(", ");
+        if (targetId) fail(`${plan.target.id}: ${plan.target.path} overlaps stale target(s) ${names}, which must be pruned first; run a full: dotfiles-layer apply`);
+        for (const [id] of blockers) blockerIds.add(id);
+        if (freedByPrune(plan.target.path, blockers, deletingPaths)) continue;
+      }
+      const parent = realParent(plan.target.path);
+      if (parent === null || insideAny(parent, layerRoots)) fail(`${plan.target.id}: ${plan.target.path} resolves to ${parent ?? "an unresolvable path"}${parent ? " inside a layer source" : ""}; refusing to write through a symlinked ancestor`);
       const status = statusFor(plan, state);
+      if (status.parentMoved && !options.force) fail(`${plan.target.id}: the parent directory of ${plan.target.path} now resolves to ${status.parent} (recorded ${status.record.parent}), so the existing output is not provably managed; inspect it, then replace it with: dotfiles-layer apply ${plan.target.id} --force (the existing content is backed up first)`);
       if (status.current) {
         if (!status.managed && !options.adopt && !options.force) fail(`${plan.target.id}: desired target already exists but is unmanaged; record ownership with: dotfiles-layer apply ${plan.target.id} --adopt`);
         continue;
@@ -438,15 +533,6 @@ export function apply(targetId, options) {
       }
     }
 
-    const stalePlans = stale.map(([id, record]) => {
-      const superseded = desiredPaths.has(record.path);
-      const actual = superseded ? record.digest : actualDigestForRecord(record);
-      if (!superseded && actual !== null && actual !== record.digest && !options.force) {
-        fail(`${id}: stale managed target ${record.path} was modified outside the compositor; inspect the file, then prune with: dotfiles-layer apply --force (the modified content is backed up first)`);
-      }
-      return { id, record, actual, superseded };
-    });
-
     let changed = 0;
     let pruned = 0;
     let persistedState = originalState;
@@ -457,8 +543,26 @@ export function apply(targetId, options) {
         persistedState = nextState;
       }
     };
+    const prune = (stalePlan) => {
+      if (!stalePlan.superseded && stalePlan.actual !== null && !stalePlan.forget) {
+        if (stalePlan.actual !== stalePlan.record.digest) backupExisting(stalePlan.record.path);
+        removeRecordedTarget(stalePlan.record);
+        removeEmptyParents(path.dirname(stalePlan.record.path));
+      }
+      delete state.targets[stalePlan.id];
+      persistState();
+      pruned++;
+    };
+
+    // Only stale outputs overlapping a new target's path are pruned before
+    // publishing; everything else is pruned after every target is in place.
+    for (const stalePlan of stalePlans) if (blockerIds.has(stalePlan.id)) prune(stalePlan);
 
     for (const plan of plans) {
+      // Recheck after pruning: nothing may be written through a symlinked
+      // ancestor into a layer source.
+      const parent = realParent(plan.target.path);
+      if (parent === null || insideAny(parent, layerRoots)) fail(`${plan.target.id}: ${plan.target.path} resolves to ${parent ?? "an unresolvable path"}${parent ? " inside a layer source" : ""}; refusing to write through a symlinked ancestor`);
       const status = statusFor(plan, state);
       if (!status.current) {
         if (plan.mergedContent) {
@@ -472,7 +576,8 @@ export function apply(targetId, options) {
         } else {
           // Managed content matching its recorded digest is reproducible from
           // the layers; anything else being displaced is preserved first.
-          const reproducible = (status.managed && status.record.digest === status.actual) || status.actual === plan.digest;
+          const reproducible = !status.parentMoved
+            && ((status.managed && status.record.digest === status.actual) || status.actual === plan.digest);
           if (status.actual !== null && !reproducible) backupExisting(plan.target.path);
           if (plan.kind === "file") atomicFile(plan.target.path, plan.content, modeFor(plan));
           else if (plan.kind === "symlink") atomicSymlink(plan.target.path, plan.source);
@@ -482,6 +587,7 @@ export function apply(targetId, options) {
       }
       state.targets[plan.target.id] = {
         path: plan.target.path,
+        parent: realParent(plan.target.path),
         strategy: plan.target.strategy,
         digest: plan.digest,
         ...(plan.target.app ? { app: plan.target.app } : {}),
@@ -491,15 +597,7 @@ export function apply(targetId, options) {
       persistState();
     }
 
-    for (const stalePlan of stalePlans) {
-      if (!stalePlan.superseded && stalePlan.actual !== null) {
-        if (stalePlan.actual !== stalePlan.record.digest) backupExisting(stalePlan.record.path);
-        removeRecordedTarget(stalePlan.record);
-      }
-      delete state.targets[stalePlan.id];
-      persistState();
-      pruned++;
-    }
+    for (const stalePlan of stalePlans) if (!blockerIds.has(stalePlan.id)) prune(stalePlan);
 
     pruneBackups();
     console.log(`Applied ${plans.length} target(s); ${changed} changed; ${pruned} pruned.`);
@@ -546,15 +644,20 @@ export function explain(targetId) {
   const selected = targetId ? [targets.get(targetId)] : [...targets.values()].sort((a, b) => compareText(a.id, b.id));
   if (targetId && !selected[0]) fail(`unknown target: ${targetId}`);
   for (const target of selected) {
-    console.log(`${target.id}: ${target.strategy} -> ${target.path}`);
+    console.log(`${target.id}: ${target.strategy} -> ${target.path}${target.feature ? ` (feature ${target.feature})` : ""}`);
     const sectionReport = target.strategy === "markdown-sections" && target.contributions.length
       ? new Map(composeMarkdownSections(target).report.map((entry) => [entry.contribution, entry.sections]))
       : null;
     for (const contribution of target.contributions) {
-      console.log(`  ${contribution.layer} (priority ${contribution.priority})${contribution.name ? ` name=${contribution.name}` : ""} source=${contribution.path}`);
+      console.log(`  ${contribution.layer} (priority ${contribution.priority})${contribution.feature ? ` feature=${contribution.feature}` : ""}${contribution.name ? ` name=${contribution.name}` : ""} source=${contribution.path}`);
       for (const section of sectionReport?.get(contribution) ?? []) {
         console.log(`    section ${section.name}${section.replacedBy ? ` (replaced by ${section.replacedBy})` : ""}`);
       }
+    }
+  }
+  if (!targetId) {
+    for (const feature of [...resolveFeatures(layers).values()].sort((a, b) => compareText(a.name, b.name))) {
+      console.log(`feature ${feature.name}: ${feature.disabledBy ? `disabled by ${feature.disabledBy}` : "enabled"} (layer ${feature.layer})`);
     }
   }
 }
@@ -600,17 +703,28 @@ function printablePlan(plan, desired) {
 export function status(targetId, showDiff = false) {
   const { targets, plans } = makePlans(targetId);
   const state = readState();
+  const desiredPaths = new Set([...targets.values()].map((target) => target.path));
+  const staleDeleting = staleRecords(state, targets).filter(([, record]) => deletes(record, desiredPaths));
+  const deletingPaths = new Set(staleDeleting.map(([, record]) => record.path));
   let different = 0;
   for (const plan of plans) {
+    const blockers = blockersOf(plan.target.path, staleDeleting);
+    if (blockers.length && (targetId || freedByPrune(plan.target.path, blockers, deletingPaths))) {
+      console.log(`${plan.target.id}: ${targetId ? `overlaps stale target(s) ${blockers.map(([id]) => id).join(", ")}; run a full apply` : "missing (replaces stale targets)"}`);
+      different++;
+      continue;
+    }
     const status = statusFor(plan, state);
     // Local overrides that merge cleanly are expected state, not a problem:
     // they ride along on future applies and do not affect the exit code.
-    const label = status.current ? "unchanged"
+    const label = status.parentMoved ? `parent directory moved to ${status.parent}`
+      : status.current ? "unchanged"
       : status.actual === null ? "missing"
       : status.merge?.clean ? "local overrides"
       : status.merge ? `conflict at ${status.merge.conflicts.join(", ")}`
       : "different";
     console.log(`${plan.target.id}: ${label}${status.managed ? " (managed)" : " (unmanaged)"}`);
+    if (status.current && status.parentMoved) different++;
     if (!status.current) {
       if (label !== "local overrides") different++;
       if (showDiff) {

@@ -794,3 +794,196 @@ test("markdown-sections level selects the heading depth that delimits sections",
   const bad = f.layer("bad", { priority: 2, targets: { notes: { strategy: "concat", path: path.join(f.home, "out/notes"), level: 2 } } });
   notOk(f.run("register", "bad", bad), /level requires the markdown-sections strategy/);
 });
+
+test("symlink targets accept directory contributions; other strategies reject them", () => {
+  const f = fixture();
+  const link = path.join(f.home, "ext/tool");
+  const dir = f.layer("dirs", {
+    priority: 1,
+    targets: { tool: { strategy: "symlink", path: link } },
+    contributions: [{ target: "tool", path: "tool" }]
+  }, { "tool/index.ts": "export {};\n", "tool/README.md": "x\n" });
+  ok(f.run("register", "dirs", dir));
+  ok(f.run("apply"));
+  assert.equal(fs.lstatSync(link).isSymbolicLink(), true);
+  assert.equal(fs.readFileSync(path.join(link, "index.ts"), "utf8"), "export {};\n");
+  assert.match(ok(f.run("status")).stdout, /tool: unchanged/);
+
+  const bad = f.layer("bad", {
+    priority: 2,
+    targets: { copied: { strategy: "copy", path: path.join(f.home, "copied") } },
+    contributions: [{ target: "copied", path: "d" }]
+  }, { "d/file": "x\n" });
+  ok(f.run("register", "bad", bad));
+  notOk(f.run("apply"), /copied \(copy\) requires file contributions/);
+});
+
+test("replacing per-file targets with a directory target prunes them and removes emptied directories", () => {
+  const f = fixture();
+  const dir = path.join(f.home, "ext/tool");
+  const files = { "tool/index.ts": "export {};\n", "tool/lib/util.ts": "export {};\n" };
+  const layerDir = f.layer("layer", {
+    priority: 1,
+    targets: { "tool-index": { strategy: "symlink", path: path.join(dir, "index.ts") }, "tool-util": { strategy: "symlink", path: path.join(dir, "lib/util.ts") } },
+    contributions: [{ target: "tool-index", path: "tool/index.ts" }, { target: "tool-util", path: "tool/lib/util.ts" }]
+  }, files);
+  ok(f.run("register", "layer", layerDir));
+  ok(f.run("apply"));
+  assert.equal(fs.lstatSync(dir).isDirectory(), true);
+
+  f.layer("layer", { priority: 1, targets: { tool: { strategy: "symlink", path: dir } }, contributions: [{ target: "tool", path: "tool" }] }, files);
+  assert.match(notOk(f.run("status")).stdout, /tool: missing \(replaces stale targets\)/);
+  assert.match(ok(f.run("apply")).stdout, /2 pruned/);
+  assert.equal(fs.lstatSync(dir).isSymbolicLink(), true);
+  assert.match(ok(f.run("status")).stdout, /tool: unchanged/);
+
+  // Untracked content in the directory still blocks the replacement.
+  f.layer("layer", { priority: 1, targets: { "tool-index": { strategy: "symlink", path: path.join(dir, "index.ts") } }, contributions: [{ target: "tool-index", path: "tool/index.ts" }] }, files);
+  ok(f.run("apply"));
+  f.write(path.join(dir, "notes.txt"), "mine\n");
+  f.layer("layer", { priority: 1, targets: { tool: { strategy: "symlink", path: dir } }, contributions: [{ target: "tool", path: "tool" }] }, files);
+  notOk(f.run("apply"), /refusing to replace unmanaged target/);
+  assert.equal(fs.readFileSync(path.join(dir, "notes.txt"), "utf8"), "mine\n");
+});
+
+test("a higher-priority layer disables a lower layer's feature, including its contributions to shared targets", () => {
+  const f = fixture();
+  const settings = path.join(f.home, "settings.json");
+  const ext = path.join(f.home, "ext/perm");
+  const base = f.layer("base", {
+    priority: 10,
+    targets: { settings: { strategy: "json-patch", path: settings } },
+    contributions: [{ target: "settings", path: "settings.patch.json" }],
+    features: {
+      perm: {
+        targets: { perm: { strategy: "symlink", path: ext } },
+        contributions: [{ target: "perm", path: "perm" }, { target: "settings", path: "perm.patch.json" }]
+      }
+    }
+  }, {
+    "settings.patch.json": JSON.stringify([{ op: "add", path: "/packages", value: ["a"] }]),
+    "perm.patch.json": JSON.stringify([{ op: "add", path: "/packages/-", value: "perm" }]),
+    "perm/index.ts": "export {};\n"
+  });
+  ok(f.run("register", "base", base));
+  ok(f.run("apply"));
+  assert.deepEqual(JSON.parse(fs.readFileSync(settings, "utf8")).packages, ["a", "perm"]);
+  assert.equal(fs.lstatSync(ext).isSymbolicLink(), true);
+  assert.match(ok(f.run("explain")).stdout, /perm: symlink -> .* \(feature perm\)[^]*feature perm: enabled \(layer base\)/);
+
+  // Disabling prunes the feature's targets (and emptied parents) and drops its contributions.
+  const work = f.layer("work", { priority: 20, disable: ["perm"] });
+  ok(f.run("register", "work", work));
+  ok(f.run("apply"));
+  assert.deepEqual(JSON.parse(fs.readFileSync(settings, "utf8")).packages, ["a"]);
+  assert.equal(fs.existsSync(path.join(f.home, "ext")), false);
+  assert.match(ok(f.run("explain")).stdout, /feature perm: disabled by work \(layer base\)/);
+
+  // The disabling layer may own the freed path itself.
+  f.layer("work", { priority: 20, disable: ["perm"], targets: { "work-perm": { strategy: "symlink", path: ext } }, contributions: [{ target: "work-perm", path: "mine" }] }, { "mine/index.ts": "mine\n" });
+  ok(f.run("apply"));
+  assert.equal(fs.readFileSync(path.join(ext, "index.ts"), "utf8"), "mine\n");
+
+  // Contributing to a disabled feature's target is an error, not a silent drop.
+  f.layer("work", { priority: 20, disable: ["perm"], contributions: [{ target: "perm", path: "mine" }] }, { "mine/index.ts": "mine\n" });
+  notOk(f.run("apply"), /work contributes to target perm of disabled feature perm/);
+
+  f.layer("work", { priority: 20, disable: ["renamed"] });
+  notOk(f.run("apply"), /work disables unknown feature renamed/);
+  f.layer("work", { priority: 10, disable: ["perm"] });
+  notOk(f.run("apply"), /only a higher-priority layer may disable a feature/);
+  f.layer("work", { priority: 20, features: { perm: {} } });
+  notOk(f.run("apply"), /duplicate feature perm in layers base and work/);
+});
+
+test("never prunes or writes through a replaced or symlinked ancestor", () => {
+  const f = fixture();
+  const link = path.join(f.home, "link");
+  const item = path.join(link, "item");
+  const withItem = { priority: 1, targets: { item: { strategy: "copy", path: item } }, contributions: [{ target: "item", path: "source" }] };
+  const layerDir = f.layer("layer", withItem, { source: "same\n" });
+  ok(f.run("register", "layer", layerDir));
+  ok(f.run("apply"));
+
+  // The owned directory moves aside; a symlink to an identical file elsewhere takes its place.
+  const outside = path.join(f.root, "outside");
+  fs.renameSync(link, path.join(f.home, "moved"));
+  f.write(path.join(outside, "item"), "same\n");
+  fs.symlinkSync(outside, link);
+  assert.match(notOk(f.run("status")).stdout, /item: parent directory moved to .*outside/);
+  notOk(f.run("apply"), /item: the parent directory .* now resolves to .*outside/);
+
+  // Once the target is removed, pruning refuses; --force forgets the record and deletes nothing.
+  f.layer("layer", { priority: 1 }, { source: "same\n" });
+  notOk(f.run("apply"), /stale target .* not provably managed output/);
+  ok(f.run("apply", "--force"));
+  assert.equal(fs.readFileSync(path.join(outside, "item"), "utf8"), "same\n");
+  assert.equal(fs.readFileSync(path.join(f.home, "moved/item"), "utf8"), "same\n");
+  assert.match(ok(f.run("status")).stdout, /^$/);
+
+  // Nothing is written into a layer source, even with --force.
+  fs.unlinkSync(link);
+  fs.symlinkSync(layerDir, link);
+  f.layer("layer", withItem, { source: "same\n" });
+  notOk(f.run("apply", "--force"), /item: .* inside a layer source; refusing to write through a symlinked ancestor/);
+
+  // Pruning through a legitimately symlinked ancestor deletes the file but not the directories behind the link.
+  const real = path.join(f.root, "real");
+  fs.mkdirSync(path.join(real, "sub"), { recursive: true });
+  fs.unlinkSync(link);
+  fs.symlinkSync(real, link);
+  const nested = { priority: 1, targets: { item: { strategy: "copy", path: path.join(link, "sub/item") } }, contributions: [{ target: "item", path: "source" }] };
+  f.layer("layer", nested, { source: "same\n" });
+  ok(f.run("apply"));
+  f.layer("layer", { priority: 1 }, { source: "same\n" });
+  ok(f.run("apply"));
+  assert.equal(fs.existsSync(path.join(real, "sub/item")), false);
+  assert.equal(fs.existsSync(path.join(real, "sub")), true);
+});
+
+test("a target overlapping stale outputs requires a full apply, which prunes them first", () => {
+  const f = fixture();
+  const ext = path.join(f.home, "extension");
+  const files = { "ext/index.ts": "origin\n", "replacement": "repo version\n" };
+  const layerDir = f.layer("layer", { priority: 1, targets: { ext: { strategy: "symlink", path: ext } }, contributions: [{ target: "ext", path: "ext" }] }, files);
+  ok(f.run("register", "layer", layerDir));
+  ok(f.run("apply"));
+
+  f.layer("layer", { priority: 1, targets: { index: { strategy: "copy", path: path.join(ext, "index.ts") } }, contributions: [{ target: "index", path: "replacement" }] }, files);
+  assert.match(notOk(f.run("status", "index")).stdout, /index: overlaps stale target\(s\) ext; run a full apply/);
+  notOk(f.run("apply", "index", "--force"), /overlaps stale target\(s\) ext, which must be pruned first; run a full/);
+  assert.equal(fs.readFileSync(path.join(layerDir, "ext/index.ts"), "utf8"), "origin\n");
+
+  ok(f.run("apply"));
+  assert.equal(fs.lstatSync(ext).isDirectory(), true);
+  assert.equal(fs.readFileSync(path.join(ext, "index.ts"), "utf8"), "repo version\n");
+  assert.equal(fs.readFileSync(path.join(layerDir, "ext/index.ts"), "utf8"), "origin\n");
+});
+
+test("an unrelated directory is not replaced, and nothing is pruned when preflight fails", () => {
+  const f = fixture();
+  const stale = path.join(f.home, "stale");
+  const layerDir = f.layer("layer", { priority: 1, targets: { stale: { strategy: "copy", path: stale } }, contributions: [{ target: "stale", path: "source" }] }, { source: "x\n" });
+  ok(f.run("register", "layer", layerDir));
+  ok(f.run("apply"));
+
+  const keep = path.join(f.home, "preserve-empty");
+  fs.mkdirSync(keep);
+  f.layer("layer", { priority: 1, targets: { keep: { strategy: "symlink", path: keep } }, contributions: [{ target: "keep", path: "source" }] }, { source: "x\n" });
+  assert.match(notOk(f.run("status")).stdout, /keep: different \(unmanaged\)/);
+  notOk(f.run("apply"), /keep: refusing to replace unmanaged target/);
+  assert.equal(fs.readFileSync(stale, "utf8"), "x\n");
+  assert.equal(fs.lstatSync(keep).isDirectory(), true);
+});
+
+test("rejects a target nested inside another target", () => {
+  const f = fixture();
+  const dir = path.join(f.home, "dir");
+  const layerDir = f.layer("layer", {
+    priority: 1,
+    targets: { outer: { strategy: "symlink", path: dir }, inner: { strategy: "copy", path: path.join(dir, "file") } },
+    contributions: [{ target: "outer", path: "d" }, { target: "inner", path: "source" }]
+  }, { "d/file": "x\n", source: "y\n" });
+  ok(f.run("register", "layer", layerDir));
+  notOk(f.run("apply"), /target inner .* lies inside target outer/);
+});
