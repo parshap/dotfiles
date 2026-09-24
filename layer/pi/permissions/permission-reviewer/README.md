@@ -94,7 +94,7 @@ set `model` (e.g. `openai-codex/gpt-5.6-luna` or `anthropic/claude-haiku-4.5`).
 ## Config
 
 `~/.pi/agent/extensions/permission-reviewer/config.json` (managed by
-dotfiles-layer from `layer/pi/extensions/permission-reviewer/config.json`). All
+dotfiles-layer from `layer/pi/permissions/permission-reviewer/config.json`). All
 keys are optional; defaults are in `config.ts`:
 
 | Key | Default | Meaning |
@@ -111,7 +111,7 @@ keys are optional; defaults are in `config.ts`:
 | `actionMaxChars` | `40000` | larger planned actions defer |
 | `maxConsecutiveDenials` / `maxTotalDenials` | `3` / `20` | fallback to the human |
 
-Activation is in `layer/pi/extensions/pi-permission-system-config.json`:
+Activation is in `layer/pi/permissions/pi-permission-system-config.json`:
 `"authorizerChain": ["permission-reviewer"]`.
 
 ## Reading decisions
@@ -139,7 +139,7 @@ show the final outcome (`decidedBy`).
 ## Tests
 
 ```sh
-cd layer/pi/extensions/permission-reviewer && node --test test/
+cd layer/pi/permissions/permission-reviewer && node --test test/
 ```
 
 Pure modules (`config.ts`, `context.ts`, `evidence.ts`, `prompt.ts`,

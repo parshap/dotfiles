@@ -43,12 +43,6 @@
       "base": "empty",
       "mode": "0600"
     },
-    "pi-codex-compact-config": {
-      "strategy": "json-patch",
-      "path": "~/.pi/agent/pi-codex-compact.json",
-      "base": "empty",
-      "mode": "0600"
-    },
     "pi-tool-manager": {
       "strategy": "symlink",
       "path": "~/.pi/agent/tool-manager.json"
@@ -87,46 +81,6 @@
     "pi-extension-statusline": {
       "strategy": "symlink",
       "path": "~/.pi/agent/extensions/statusline.ts"
-    },
-    "pi-permission-system-config": {
-      "strategy": "symlink",
-      "path": "~/.pi/agent/extensions/pi-permission-system/config.json"
-    },
-    "pi-extension-permission-reviewer-index-ts": {
-      "strategy": "symlink",
-      "path": "~/.pi/agent/extensions/permission-reviewer/index.ts"
-    },
-    "pi-extension-permission-reviewer-config-ts": {
-      "strategy": "symlink",
-      "path": "~/.pi/agent/extensions/permission-reviewer/config.ts"
-    },
-    "pi-extension-permission-reviewer-context-ts": {
-      "strategy": "symlink",
-      "path": "~/.pi/agent/extensions/permission-reviewer/context.ts"
-    },
-    "pi-extension-permission-reviewer-evidence-ts": {
-      "strategy": "symlink",
-      "path": "~/.pi/agent/extensions/permission-reviewer/evidence.ts"
-    },
-    "pi-extension-permission-reviewer-policy-ts": {
-      "strategy": "symlink",
-      "path": "~/.pi/agent/extensions/permission-reviewer/policy.ts"
-    },
-    "pi-extension-permission-reviewer-prompt-ts": {
-      "strategy": "symlink",
-      "path": "~/.pi/agent/extensions/permission-reviewer/prompt.ts"
-    },
-    "pi-extension-permission-reviewer-review-ts": {
-      "strategy": "symlink",
-      "path": "~/.pi/agent/extensions/permission-reviewer/review.ts"
-    },
-    "pi-extension-permission-reviewer-config-json": {
-      "strategy": "symlink",
-      "path": "~/.pi/agent/extensions/permission-reviewer/config.json"
-    },
-    "pi-extension-permission-reviewer-readme-md": {
-      "strategy": "symlink",
-      "path": "~/.pi/agent/extensions/permission-reviewer/README.md"
     },
     "pi-extension-skill-projection-index": {
       "strategy": "symlink",
@@ -228,10 +182,6 @@
       "path": "pi/usage.patch.json"
     },
     {
-      "target": "pi-codex-compact-config",
-      "path": "pi/codex-compact.patch.json"
-    },
-    {
       "target": "pi-tool-manager",
       "path": "pi/tool-manager.json"
     },
@@ -264,46 +214,6 @@
       "path": "pi/extensions/statusline.ts"
     },
     {
-      "target": "pi-permission-system-config",
-      "path": "pi/extensions/pi-permission-system-config.json"
-    },
-    {
-      "target": "pi-extension-permission-reviewer-index-ts",
-      "path": "pi/extensions/permission-reviewer/index.ts"
-    },
-    {
-      "target": "pi-extension-permission-reviewer-config-ts",
-      "path": "pi/extensions/permission-reviewer/config.ts"
-    },
-    {
-      "target": "pi-extension-permission-reviewer-context-ts",
-      "path": "pi/extensions/permission-reviewer/context.ts"
-    },
-    {
-      "target": "pi-extension-permission-reviewer-evidence-ts",
-      "path": "pi/extensions/permission-reviewer/evidence.ts"
-    },
-    {
-      "target": "pi-extension-permission-reviewer-policy-ts",
-      "path": "pi/extensions/permission-reviewer/policy.ts"
-    },
-    {
-      "target": "pi-extension-permission-reviewer-prompt-ts",
-      "path": "pi/extensions/permission-reviewer/prompt.ts"
-    },
-    {
-      "target": "pi-extension-permission-reviewer-review-ts",
-      "path": "pi/extensions/permission-reviewer/review.ts"
-    },
-    {
-      "target": "pi-extension-permission-reviewer-config-json",
-      "path": "pi/extensions/permission-reviewer/config.json"
-    },
-    {
-      "target": "pi-extension-permission-reviewer-readme-md",
-      "path": "pi/extensions/permission-reviewer/README.md"
-    },
-    {
       "target": "pi-extension-skill-projection-index",
       "path": "pi/extensions/skill-projection/index.ts"
     },
@@ -323,5 +233,53 @@
       "target": "pi-lib-statusline-claude",
       "path": "pi/lib/statusline-claude.mjs"
     }
-  ]
+  ],
+  "features": {
+    "pi-permissions": {
+      "targets": {
+        "pi-permission-system-config": {
+          "strategy": "symlink",
+          "path": "~/.pi/agent/extensions/pi-permission-system/config.json"
+        },
+        "pi-extension-permission-reviewer": {
+          "strategy": "symlink",
+          "path": "~/.pi/agent/extensions/permission-reviewer"
+        }
+      },
+      "contributions": [
+        {
+          "target": "pi-settings",
+          "path": "pi/permissions/settings.patch.json"
+        },
+        {
+          "target": "pi-permission-system-config",
+          "path": "pi/permissions/pi-permission-system-config.json"
+        },
+        {
+          "target": "pi-extension-permission-reviewer",
+          "path": "pi/permissions/permission-reviewer"
+        }
+      ]
+    },
+    "pi-codex-compact": {
+      "targets": {
+        "pi-codex-compact-config": {
+          "strategy": "json-patch",
+          "path": "~/.pi/agent/pi-codex-compact.json",
+          "base": "empty",
+          "mode": "0600"
+        }
+      },
+      "contributions": [
+        {
+          "target": "pi-settings",
+          "path": "pi/codex-compact/settings.patch.json"
+        },
+        {
+          "target": "pi-codex-compact-config",
+          "path": "pi/codex-compact/config.patch.json"
+        }
+      ]
+    }
+  }
 }
