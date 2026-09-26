@@ -56,10 +56,6 @@
       "strategy": "symlink",
       "path": "~/.pi/agent/extensions/refresh-screen.ts"
     },
-    "pi-extension-subagent-zone-profile": {
-      "strategy": "symlink",
-      "path": "~/.pi/agent/extensions/subagent-zone-profile.ts"
-    },
     "pi-extension-statusline": {
       "strategy": "symlink",
       "path": "~/.pi/agent/extensions/statusline.ts"
@@ -160,10 +156,6 @@
     {
       "target": "pi-extension-refresh-screen",
       "path": "pi/extensions/refresh-screen.ts"
-    },
-    {
-      "target": "pi-extension-subagent-zone-profile",
-      "path": "pi/extensions/subagent-zone-profile.ts"
     },
     {
       "target": "pi-extension-statusline",
