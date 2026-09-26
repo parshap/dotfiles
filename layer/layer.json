@@ -186,8 +186,16 @@
     "pi-permissions": {
       "targets": {
         "pi-permission-system-config": {
-          "strategy": "symlink",
-          "path": "~/.pi/agent/extensions/pi-permission-system/config.json"
+          "strategy": "json-merge-patch",
+          "path": "~/.pi/agent/extensions/pi-permission-system/config.json",
+          "base": "empty",
+          "preserve": [
+            "/yoloMode",
+            "/debugLog",
+            "/permissionReviewLog",
+            "/doublePressToConfirm"
+          ],
+          "mode": "0600"
         },
         "pi-extension-permission-reviewer": {
           "strategy": "symlink",
