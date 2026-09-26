@@ -1,0 +1,14 @@
+[
+  {
+    "op": "add",
+    "path": "/packages/-",
+    "value": "npm:pi-subagents"
+  },
+  {
+    "op": "add",
+    "path": "/subagents",
+    "value": {
+      "disableBuiltins": true
+    }
+  }
+]

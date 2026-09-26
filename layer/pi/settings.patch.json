@@ -8,35 +8,7 @@
     "op": "add",
     "path": "/packages",
     "value": [
-      "npm:pi-subagents",
-      "npm:@vanillagreen/pi-prompt-stash",
-      "git:github.com/DietrichGebert/ponytail",
-      "./plugins/clerk-docs",
-      "npm:@gotgenes/pi-anthropic-auth",
-      "npm:pi-native-search",
-      "npm:@pi-plugins/usage",
       "npm:pi-context-view"
-    ]
-  },
-  {
-    "op": "add",
-    "path": "/defaultProvider",
-    "value": "anthropic"
-  },
-  {
-    "op": "add",
-    "path": "/defaultModel",
-    "value": "claude-opus-5-5"
-  },
-  {
-    "op": "add",
-    "path": "/enabledModels",
-    "value": [
-      "anthropic/claude-opus-5-5",
-      "openai-codex/gpt-6-sol",
-      "openai-codex/gpt-6-luna",
-      "openai-codex/gpt-6-astra",
-      "anthropic/claude-fable-5-1"
     ]
   },
   {
@@ -63,25 +35,5 @@
     "op": "add",
     "path": "/tuiMode",
     "value": "fullscreen"
-  },
-  {
-    "op": "add",
-    "path": "/kendex",
-    "value": {
-      "extensionManager": {
-        "config": {
-          "@vanillagreen/pi-prompt-stash": {
-            "shortcut": "ctrl+s"
-          }
-        }
-      }
-    }
-  },
-  {
-    "op": "add",
-    "path": "/subagents",
-    "value": {
-      "disableBuiltins": true
-    }
   }
 ]

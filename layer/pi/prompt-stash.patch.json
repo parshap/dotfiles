@@ -1,0 +1,20 @@
+[
+  {
+    "op": "add",
+    "path": "/packages/-",
+    "value": "npm:@vanillagreen/pi-prompt-stash"
+  },
+  {
+    "op": "add",
+    "path": "/kendex",
+    "value": {
+      "extensionManager": {
+        "config": {
+          "@vanillagreen/pi-prompt-stash": {
+            "shortcut": "ctrl+s"
+          }
+        }
+      }
+    }
+  }
+]

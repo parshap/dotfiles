@@ -2,6 +2,6 @@
   {
     "op": "add",
     "path": "/packages/-",
-    "value": "npm:@narumitw/pi-codex-compact@0.53.1"
+    "value": "./plugins/clerk-docs"
   }
 ]

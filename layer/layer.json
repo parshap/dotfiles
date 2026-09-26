@@ -37,12 +37,6 @@
       "base": "empty",
       "mode": "0600"
     },
-    "pi-usage-config": {
-      "strategy": "json-patch",
-      "path": "~/.pi/agent/extensions/usage.json",
-      "base": "empty",
-      "mode": "0600"
-    },
     "pi-tool-manager": {
       "strategy": "symlink",
       "path": "~/.pi/agent/tool-manager.json"
@@ -62,21 +56,9 @@
       "strategy": "symlink",
       "path": "~/.pi/agent/extensions/refresh-screen.ts"
     },
-    "pi-extension-subagent-foreground-guard": {
-      "strategy": "symlink",
-      "path": "~/.pi/agent/extensions/subagent-foreground-guard.ts"
-    },
     "pi-extension-subagent-zone-profile": {
       "strategy": "symlink",
       "path": "~/.pi/agent/extensions/subagent-zone-profile.ts"
-    },
-    "pi-agent-explore": {
-      "strategy": "symlink",
-      "path": "~/.pi/agent/agents/explore.md"
-    },
-    "pi-agent-worker": {
-      "strategy": "symlink",
-      "path": "~/.pi/agent/agents/worker.md"
     },
     "pi-extension-statusline": {
       "strategy": "symlink",
@@ -101,12 +83,6 @@
     "pi-lib-statusline-claude": {
       "strategy": "symlink",
       "path": "~/.pi/agent/lib/statusline-claude.mjs"
-    },
-    "ponytail-config": {
-      "strategy": "json-patch",
-      "path": "~/.config/ponytail/config.json",
-      "base": "empty",
-      "mode": "0600"
     },
     "zsh-fragments": {
       "strategy": "native-include",
@@ -170,16 +146,8 @@
       "path": "pi/settings.patch.json"
     },
     {
-      "target": "ponytail-config",
-      "path": "ponytail/config.patch.json"
-    },
-    {
       "target": "pi-statusline-config",
       "path": "pi/statusline.patch.json"
-    },
-    {
-      "target": "pi-usage-config",
-      "path": "pi/usage.patch.json"
     },
     {
       "target": "pi-tool-manager",
@@ -194,20 +162,8 @@
       "path": "pi/extensions/refresh-screen.ts"
     },
     {
-      "target": "pi-extension-subagent-foreground-guard",
-      "path": "pi/extensions/subagent-foreground-guard.ts"
-    },
-    {
       "target": "pi-extension-subagent-zone-profile",
       "path": "pi/extensions/subagent-zone-profile.ts"
-    },
-    {
-      "target": "pi-agent-explore",
-      "path": "pi/agents/explore.md"
-    },
-    {
-      "target": "pi-agent-worker",
-      "path": "pi/agents/worker.md"
     },
     {
       "target": "pi-extension-statusline",
@@ -261,11 +217,17 @@
         }
       ]
     },
-    "pi-codex-compact": {
+    "pi-personal-providers": {
       "targets": {
         "pi-codex-compact-config": {
           "strategy": "json-patch",
           "path": "~/.pi/agent/pi-codex-compact.json",
+          "base": "empty",
+          "mode": "0600"
+        },
+        "pi-usage-config": {
+          "strategy": "json-patch",
+          "path": "~/.pi/agent/extensions/usage.json",
           "base": "empty",
           "mode": "0600"
         }
@@ -273,11 +235,103 @@
       "contributions": [
         {
           "target": "pi-settings",
-          "path": "pi/codex-compact/settings.patch.json"
+          "path": "pi/providers/settings.patch.json"
         },
         {
           "target": "pi-codex-compact-config",
-          "path": "pi/codex-compact/config.patch.json"
+          "path": "pi/providers/codex-compact.patch.json"
+        },
+        {
+          "target": "pi-usage-config",
+          "path": "pi/providers/usage.patch.json"
+        }
+      ]
+    },
+    "clerk-docs": {
+      "targets": {
+        "claude-skill-clerk-docs": {
+          "strategy": "symlink",
+          "path": "~/.claude/skills/clerk-docs"
+        },
+        "pi-plugin-clerk-docs": {
+          "strategy": "symlink",
+          "path": "~/.pi/agent/plugins/clerk-docs"
+        }
+      },
+      "contributions": [
+        {
+          "target": "claude-skill-clerk-docs",
+          "path": "agent-plugins/clerk-docs/skills/clerk-docs"
+        },
+        {
+          "target": "pi-plugin-clerk-docs",
+          "path": "agent-plugins/clerk-docs"
+        },
+        {
+          "target": "pi-settings",
+          "path": "pi/clerk-docs.patch.json"
+        }
+      ]
+    },
+    "pi-subagents": {
+      "targets": {
+        "pi-agent-explore": {
+          "strategy": "symlink",
+          "path": "~/.pi/agent/agents/explore.md"
+        },
+        "pi-agent-worker": {
+          "strategy": "symlink",
+          "path": "~/.pi/agent/agents/worker.md"
+        },
+        "pi-extension-subagent-foreground-guard": {
+          "strategy": "symlink",
+          "path": "~/.pi/agent/extensions/subagent-foreground-guard.ts"
+        }
+      },
+      "contributions": [
+        {
+          "target": "pi-settings",
+          "path": "pi/subagents/settings.patch.json"
+        },
+        {
+          "target": "pi-agent-explore",
+          "path": "pi/subagents/agents/explore.md"
+        },
+        {
+          "target": "pi-agent-worker",
+          "path": "pi/subagents/agents/worker.md"
+        },
+        {
+          "target": "pi-extension-subagent-foreground-guard",
+          "path": "pi/subagents/subagent-foreground-guard.ts"
+        }
+      ]
+    },
+    "ponytail": {
+      "targets": {
+        "ponytail-config": {
+          "strategy": "json-patch",
+          "path": "~/.config/ponytail/config.json",
+          "base": "empty",
+          "mode": "0600"
+        }
+      },
+      "contributions": [
+        {
+          "target": "pi-settings",
+          "path": "ponytail/pi-settings.patch.json"
+        },
+        {
+          "target": "ponytail-config",
+          "path": "ponytail/config.patch.json"
+        }
+      ]
+    },
+    "prompt-stash": {
+      "contributions": [
+        {
+          "target": "pi-settings",
+          "path": "pi/prompt-stash.patch.json"
         }
       ]
     }

@@ -1,0 +1,43 @@
+[
+  {
+    "op": "add",
+    "path": "/packages/-",
+    "value": "npm:@gotgenes/pi-anthropic-auth"
+  },
+  {
+    "op": "add",
+    "path": "/packages/-",
+    "value": "npm:@narumitw/pi-codex-compact@0.53.1"
+  },
+  {
+    "op": "add",
+    "path": "/packages/-",
+    "value": "npm:@pi-plugins/usage"
+  },
+  {
+    "op": "add",
+    "path": "/packages/-",
+    "value": "npm:pi-native-search"
+  },
+  {
+    "op": "add",
+    "path": "/defaultProvider",
+    "value": "anthropic"
+  },
+  {
+    "op": "add",
+    "path": "/defaultModel",
+    "value": "claude-opus-5-5"
+  },
+  {
+    "op": "add",
+    "path": "/enabledModels",
+    "value": [
+      "anthropic/claude-opus-5-5",
+      "openai-codex/gpt-6-sol",
+      "openai-codex/gpt-6-luna",
+      "openai-codex/gpt-6-astra",
+      "anthropic/claude-fable-5-1"
+    ]
+  }
+]

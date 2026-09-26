@@ -7,7 +7,7 @@
   "plugins": [
     {
       "name": "clerk-docs",
-      "source": "./agent-plugins/clerk-docs",
+      "source": "./layer/agent-plugins/clerk-docs",
       "description": "Documentation roles, a loose spec-driven change flow, and an end-of-work capture checklist for projects worked with AI agents."
     }
   ]
