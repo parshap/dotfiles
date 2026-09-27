@@ -230,6 +230,10 @@
           "path": "~/.pi/agent/extensions/usage.json",
           "base": "empty",
           "mode": "0600"
+        },
+        "pi-extension-anthropic-compact": {
+          "strategy": "symlink",
+          "path": "~/.pi/agent/extensions/anthropic-compact"
         }
       },
       "contributions": [
@@ -244,6 +248,10 @@
         {
           "target": "pi-usage-config",
           "path": "pi/providers/usage.patch.json"
+        },
+        {
+          "target": "pi-extension-anthropic-compact",
+          "path": "pi/providers/anthropic-compact"
         }
       ]
     },
