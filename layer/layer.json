@@ -294,6 +294,10 @@
         "pi-extension-subagent-foreground-guard": {
           "strategy": "symlink",
           "path": "~/.pi/agent/extensions/subagent-foreground-guard.ts"
+        },
+        "pi-subagent-config": {
+          "strategy": "symlink",
+          "path": "~/.pi/agent/extensions/subagent/config.json"
         }
       },
       "contributions": [
@@ -312,6 +316,10 @@
         {
           "target": "pi-extension-subagent-foreground-guard",
           "path": "pi/subagents/subagent-foreground-guard.ts"
+        },
+        {
+          "target": "pi-subagent-config",
+          "path": "pi/subagents/config.json"
         }
       ]
     },
