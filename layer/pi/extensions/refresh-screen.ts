@@ -10,21 +10,10 @@
  *
  * The terminal is the only authority, because the terminal's own background is
  * what has to stay readable, and it can legitimately differ from the OS
- * appearance. Detection asks for DSR ?996 first, then falls back to the OSC 11
- * background color, the same query pi uses at startup. When neither answers,
- * nothing is guessed: the theme is left alone and the failure is reported.
- *
- * OSC 11 goes through queryBackgroundColor() rather than a single
- * TUI.queryTerminalBackgroundColor() call, to survive a pi-tui bug: on timeout
- * that method leaves the settled query in `pendingOsc11BackgroundQueries` and
- * never decrements `pendingOsc11BackgroundReplies`, and its response matcher is
- * anchored, so a reply arriving late or split across stdin chunks is never
- * consumed. The queue is then permanently one reply behind — each new query has
- * its response absorbed by the stale head entry and times out — which used to
- * kill Ctrl+L for the rest of a session's life. Concurrent queries defeat that:
- * with a lag of k, k+1 in flight means k responses drain stale entries and one
- * still resolves. Sequential retries can never win, since each attempt adds
- * exactly one entry and each response removes exactly one.
+ * appearance. Detection follows pi's precedence: the OSC 11 background color
+ * decides, and the DSR ?996 color-scheme report is the fallback for terminals
+ * that do not report their background. When neither answers, nothing is
+ * guessed: the theme is left alone and the failure is reported.
  *
  * Applying the theme is done here rather than left to pi's
  * InteractiveThemeController, which only reacts to color-scheme reports while
@@ -38,21 +27,24 @@ import fs from "node:fs";
 import path from "node:path";
 import { CONFIG_DIR_NAME, getAgentDir } from "@earendil-works/pi-coding-agent";
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
-import type { TUI } from "@earendil-works/pi-tui";
+import type { RgbColor, TerminalColorScheme, TUI } from "@earendil-works/pi-tui";
 
 const QUERY_TIMEOUT_MS = 500;
 
 type Scheme = "light" | "dark";
 type Detection = { scheme: Scheme; source: string; detail?: string };
 
-/** pi's getRgbColorLuminance + getThemeForRgbColor (WCAG relative luminance, 0.5 split). */
-function schemeForRgb({ r, g, b }: { r: number; g: number; b: number }): Scheme {
+/**
+ * pi's terminalAppearance() without its foreground heuristic: dark when white
+ * text has more WCAG contrast on the background than black text.
+ */
+function schemeForRgb({ r, g, b }: RgbColor): Scheme {
   const toLinear = (channel: number) => {
     const value = channel / 255;
-    return value <= 0.03928 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4;
+    return value <= 0.04045 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4;
   };
   const luminance = 0.2126 * toLinear(r) + 0.7152 * toLinear(g) + 0.0722 * toLinear(b);
-  return luminance >= 0.5 ? "light" : "dark";
+  return 1.05 / (luminance + 0.05) >= (luminance + 0.05) / 0.05 ? "dark" : "light";
 }
 
 /** Project settings override global settings, matching SettingsManager. */
@@ -111,38 +103,29 @@ function applyScheme(ctx: ExtensionContext, scheme: Scheme): ApplyResult {
 
 export default function (pi: ExtensionAPI) {
   let tui: TUI | undefined;
-  let oscEverAnswered = false;
-
-  /** First resolving reply from `count` concurrent OSC 11 queries. */
-  async function queryBackgroundColor(t: TUI, count: number) {
-    const replies = await Promise.all(
-      Array.from({ length: count }, () =>
-        t.queryTerminalBackgroundColor({ timeoutMs: QUERY_TIMEOUT_MS }),
-      ),
-    );
-    const rgb = replies.find((reply) => reply !== undefined);
-    if (rgb) oscEverAnswered = true;
-    return rgb;
-  }
 
   async function detectFromTerminal(t: TUI): Promise<Detection | undefined> {
-    // queryTerminalColorScheme() is listener-based and carries no pending-reply
-    // bookkeeping, so it needs no workaround.
-    const reported = await t.queryTerminalColorScheme({ timeoutMs: QUERY_TIMEOUT_MS });
-    if (reported) return { scheme: reported, source: "DSR ?996" };
+    const { background: rgb } = await t.queryTerminalColors({ timeoutMs: QUERY_TIMEOUT_MS });
+    if (rgb) {
+      return {
+        scheme: schemeForRgb(rgb),
+        source: "OSC 11",
+        detail: `rgb(${rgb.r}, ${rgb.g}, ${rgb.b})`,
+      };
+    }
 
-    // Two in flight covers the usual lag of one. Escalate only after the
-    // terminal has proven it answers OSC 11 at all, so terminals without OSC 11
-    // support are not handed extra queries to leak.
-    const rgb =
-      (await queryBackgroundColor(t, 2)) ??
-      (oscEverAnswered ? await queryBackgroundColor(t, 4) : undefined);
-    if (!rgb) return undefined;
-    return {
-      scheme: schemeForRgb(rgb),
-      source: "OSC 11",
-      detail: `rgb(${rgb.r}, ${rgb.g}, ${rgb.b})`,
-    };
+    // pi-tui parses ?997 replies into color-scheme listeners but no longer sends ?996n itself.
+    let unsubscribe = () => {};
+    const reported = await new Promise<TerminalColorScheme | undefined>((resolve) => {
+      const timer = setTimeout(() => resolve(undefined), QUERY_TIMEOUT_MS);
+      unsubscribe = t.onTerminalColorSchemeChange((scheme) => {
+        clearTimeout(timer);
+        resolve(scheme);
+      });
+      t.terminal.write("\x1b[?996n");
+    });
+    unsubscribe();
+    return reported && { scheme: reported, source: "DSR ?996" };
   }
 
   async function refresh(ctx: ExtensionContext, options?: { report?: boolean; arg?: string }) {
@@ -172,7 +155,7 @@ export default function (pi: ExtensionAPI) {
 
     if (!detection) {
       ctx.ui.notify(
-        "Terminal answered neither DSR ?996 nor OSC 11; theme left unchanged.",
+        "Terminal answered neither OSC 11 nor DSR ?996; theme left unchanged.",
         "error",
       );
       return;
