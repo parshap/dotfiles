@@ -52,14 +52,6 @@
       "strategy": "symlink",
       "path": "~/.pi/agent/extensions/statusline.ts"
     },
-    "pi-extension-skill-projection-index": {
-      "strategy": "symlink",
-      "path": "~/.pi/agent/extensions/skill-projection/index.ts"
-    },
-    "pi-extension-skill-projection-readme": {
-      "strategy": "symlink",
-      "path": "~/.pi/agent/extensions/skill-projection/README.md"
-    },
     "pi-lib-statusline-core": {
       "strategy": "symlink",
       "path": "~/.pi/agent/lib/statusline-core.mjs"
@@ -144,14 +136,6 @@
     {
       "target": "pi-extension-statusline",
       "path": "pi/extensions/statusline.ts"
-    },
-    {
-      "target": "pi-extension-skill-projection-index",
-      "path": "pi/extensions/skill-projection/index.ts"
-    },
-    {
-      "target": "pi-extension-skill-projection-readme",
-      "path": "pi/extensions/skill-projection/README.md"
     },
     {
       "target": "pi-lib-statusline-core",
