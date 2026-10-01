@@ -18,10 +18,6 @@
       "base": "empty",
       "mode": "0600"
     },
-    "pi-mcp-client": {
-      "strategy": "symlink",
-      "path": "~/.pi/agent/mcp-client.yaml"
-    },
     "pi-settings": {
       "strategy": "json-patch",
       "path": "~/.pi/agent/settings.json",
@@ -36,10 +32,6 @@
       "path": "~/.pi/agent/statusline.json",
       "base": "empty",
       "mode": "0600"
-    },
-    "pi-tool-manager": {
-      "strategy": "symlink",
-      "path": "~/.pi/agent/tool-manager.json"
     },
     "claude-instructions": {
       "strategy": "markdown-sections",
@@ -134,20 +126,12 @@
       "path": "pi/mcp.patch.json"
     },
     {
-      "target": "pi-mcp-client",
-      "path": "pi/mcp-client.yaml"
-    },
-    {
       "target": "pi-settings",
       "path": "pi/settings.patch.json"
     },
     {
       "target": "pi-statusline-config",
       "path": "pi/statusline.patch.json"
-    },
-    {
-      "target": "pi-tool-manager",
-      "path": "pi/tool-manager.json"
     },
     {
       "target": "claude-settings",

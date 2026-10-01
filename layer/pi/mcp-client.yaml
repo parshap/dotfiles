@@ -1,5 +1,0 @@
-# Progressive MCP loading: advertise servers and tool names initially, then
-# activate full tool schemas only when needed.
-visibility:
-  server: description
-  tools: names
